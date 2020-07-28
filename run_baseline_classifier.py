@@ -415,8 +415,8 @@ def train(args, train_dataset, model, tokenizer):
             model.train()
             if args.doc_batching:
                 batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
-                labels = tuple(l[0, :] for l in batch[3])
-                ranks = tuple(r[0, :] for r in batch[-1])
+                labels = batch[3]
+                ranks = batch[-1]
             else:
                 batch = tuple(t.to(args.device) for t in batch)
                 labels = batch[3]
