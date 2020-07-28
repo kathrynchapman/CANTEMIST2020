@@ -529,7 +529,11 @@ def evaluate(args, model, tokenizer, prefix=""):
     ids = []
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
         model.eval()
-        batch = tuple(t.to(args.device) for t in batch)
+
+        if args.doc_batching:
+            batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
+        else:
+            batch = tuple(t.to(args.device) for t in batch)
 
         with torch.no_grad():
             if args.doc_batching:
@@ -819,7 +823,7 @@ def main():
         help="Threshold at which to decide between 0 and 1 for labels.",
     )
     parser.add_argument(
-        "--loss_fct", default="bce", type=str, help="The function to use.",
+        "--loss_fct", default="bce", type=str, help="The loss function to use.",
     )
     parser.add_argument(
         "--config_name", default="", type=str, help="Pretrained config name or path if not the same as model_name",
