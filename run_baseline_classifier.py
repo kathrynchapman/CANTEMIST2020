@@ -537,11 +537,14 @@ def evaluate(args, model, tokenizer, prefix=""):
 
         with torch.no_grad():
             if args.doc_batching:
-                labs = batch[3][0][0, :]
-                rnks = batch[-1][0][0, :]
+                # print(batch[3])
+                # labs = batch[3][0][0,:]
+                labs = batch[3][0]
+                # rnks = batch[-1][0][0, :]
+                rnks = batch[-1][0]
+
                 # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
-                inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs,
-                          "ranks": rnks}
+                inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs, "ranks": rnks}
             else:
                 labs = batch[3][0]
                 rnks = batch[-1][0]
