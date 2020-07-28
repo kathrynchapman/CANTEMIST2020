@@ -15,10 +15,11 @@ import random
 import json
 import argparse
 from loss import BalancedBCEWithLogitsLoss
-import scipy.stats as ss
-
-from torch.utils.data import Dataset, RandomSampler, DataLoader, SequentialSampler
+import random
 from utils import *
+import scipy.stats as ss
+from torch.utils.data import Dataset, RandomSampler, DataLoader, SequentialSampler
+
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss
 
 from transformers.modeling_bert import BertConfig, BertModel, BertPreTrainedModel
@@ -52,27 +53,9 @@ class ICDDataloader(Dataset):
         return self.data[idx]
         # return self.data.iloc[idx,]
 def plackett_luce(some_list):
-
     for i in range(1,len(some_list)):
         some_list[i] /= np.sum(some_list[i:])
     return np.sum(np.log(some_list))
-
-
-# def check_rankings(ranking_probs):
-#     to_return = []
-#     for probs in ranking_probs:
-#         while len(probs) > 1:
-#             to_return.append(probs[0] > torch.Tensor([probs[i] for i in range(1, len(probs))]))
-#             probs = probs[1:]
-#     return to_return
-
-def check_rankings(ranking_probs):
-    to_return = []
-    for probs in ranking_probs:
-        while len(probs) > 1:
-            to_return.append(probs[0] > torch.Tensor([probs[i] for i in range(1, len(probs))]))
-            probs = probs[1:]
-    return to_return
 
 
 def simple_accuracy(preds, labels):
@@ -117,6 +100,8 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         self.args = args
         self.w1 = torch.nn.Linear(args.doc_max_seq_length, 1)
         self.w2 = torch.nn.Linear(args.label_max_seq_length, 1)
+        # if self.args.logit_aggregation == 'layer':
+        #     self.logit_agg = torch.nn.Linear()
         # self.classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
         self.hidden_size = config.hidden_size
         self.init_weights()
@@ -213,7 +198,10 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         temp = self.w2(temp)
 
         logits = temp.view(-1, self.num_labels)
-        logits = torch.max(logits, axis=0)[0]
+        if self.args.logit_aggregation == 'max':
+            logits = torch.max(logits, axis=0)[0]
+        elif self.args.logit_aggregation == 'avg':
+            logits = torch.mean(logits, axis=0)
         # print("logits.shape:", logits.shape)
 
 
@@ -227,12 +215,17 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         outputs = (logits,)  # + outputs[2:]  # add hidden states and attention if they are here
 
         if labels is not None:
-            labels = labels[0,:]
+            # labels = labels[0,:]
 
             if self.args.do_iterative_class_weights:
                 # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
+                temp = logits.detach()
+                temp = sigmoid(temp)
+                temp = (temp > self.args.prediction_threshold).float()
                 temp = torch.mean(
-                    torch.abs(logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels)).float() + 1, axis=0)
+                    torch.abs(temp.view(-1, self.num_labels) - labels.view(-1, self.num_labels)).float() + 1, axis=0)
+
+
                 self.class_weights = self.class_weights.cuda()
 
                 self.class_weights *= self.iteration
@@ -251,114 +244,8 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
             labels = labels.float()
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
             if self.args.do_ranking_loss:
-
-
-
-                # #############################################################
-                # # pred_probs = np.random.rand(495)
-                # temp = torch.nn.Sigmoid()(logits).cpu().detach().numpy()
-                # ranks = ranks.cpu().detach().numpy()
-                # n_labels = np.ndarray.max(ranks, axis=1)  # shape: batch_size
-                #
-                # true_label_probs = [temp[r, m] for r, m in enumerate([np.argsort(ranks)[i, -j:] for i, j in enumerate(n_labels)])]
-                # true_label_probs = [np.flip(b_i) for b_i in true_label_probs] # these are the first n elements of our new array
-                #
-                #
-                # # now, we want to concatenate this with the remaining elements, which are sorted in descending order
-                #
-                # remaining_probs = [temp[r, m] for r, m in enumerate([np.argsort(ranks)[i, :-j] for i, j in enumerate(n_labels)])]
-                #
-                # remaining_probs = [np.flip(np.sort(r)) for r in remaining_probs]
-                #
-                # temp = []
-                # for t, r in zip(true_label_probs, remaining_probs):
-                #     temp2 = np.concatenate((t, r))
-                #     temp.append(temp2)
-                #
-                # loss_ranking = -plackett_luce(temp)  # THIS!!!!! We want to minimize this!!
-                # #############################################################
-
-
-
-
-
-                #############################################################
-                # 1 - apply sigmoid to logits to get probabilities
-                # temp = torch.nn.Sigmoid()(logits).cpu()
-                temp = logits.cpu()
-                ranks = ranks.cpu()
-                # temp = torch.nn.Sigmoid()(logits)
-                n_labels = torch.max(ranks, axis=1)[0]  # shape: batch_size
-
-                # 2 - separate true probs from remaining probs; rank true probs (there are no rankings for negative labels)
-                true_label_probs = [torch.flip(temp[r, m], dims=(0,)) for r, m in
-                                    enumerate([torch.argsort(ranks)[i, -j:] for i, j in enumerate(n_labels)])]
-                # ^ probabilities of all of the true positive labels, sorted in descending rank order
-
-                remaining_probs = [temp[r, m] for r, m in
-                                   enumerate([torch.argsort(ranks)[i, :-j] for i, j in enumerate(n_labels)])]
-                # ^ probabilities of all of the true negative labels
-
-                # 3 - check if lowest-ranking true positive probability is higher than all negative class probs
-                lowest_ranking_probs = torch.Tensor([t[-1] for t in true_label_probs])
-                highest_remaining_probs = torch.Tensor([torch.max(t) for t in remaining_probs])
-                temp = lowest_ranking_probs - highest_remaining_probs
-                temp[temp < 0] = 0
-                add_to_loss1 = torch.sum(temp).item()
-
-                # 4 - check that the probabilities are ranked in order
-                vals = check_rankings(true_label_probs)
-                total_correct = sum(sum(t) for t in vals).item()
-                total_labels = sum(len(t) for t in vals)
-                add_to_loss2 = 1 - (total_correct/total_labels)
-
-                # print('loss main:', loss)
-                loss += add_to_loss1
-                loss += add_to_loss2
-                # print("loss1:", add_to_loss1)
-                # print("loss2:", add_to_loss2)
-
-                #############################################################
-
-                # print("RANKS SHAPE:", ranks.shape)
-                #
-                #
-                # # ranks.shape: [8, 455]
-                #
-                #
-                # # do ranking loss
-                # temp = logits.cpu().detach().numpy()
-                # # print(type(temp))
-                # # print("TEMP SIZE:", temp.size())
-                # #
-                # # print("LOGITS SHAPE:", logits.shape)
-                #
-                # temp = torch.nn.Sigmoid()(torch.from_numpy(temp))  # apply sigmoid
-                #
-                # lowest_ranking_label_prob = ((ranks==1).nonzero())  # get the probability values of the lowest ranks
-                #
-                # lowest_values = logits[torch.arange(logits.size(0)), [d[1].item() for d in lowest_ranking_label_prob]]
-                # # these are the values at the lowest rank of the ground truth positive labels for all data in batch
-                #
-                #
-                #
-                #
-                # temp[temp<0.5] = 0
-                # # l_bin[l_bin == 0] = -1
-                #
-                # logit_ranks = torch.from_numpy(ss.rankdata(temp, method='dense', axis=1)) - 1
-                #
-                # print("PRED RANKS:", logit_ranks.tolist()[0])
-                # print("TRUE RANKS:", ranks.tolist()[0])
-                #
-                #
-                # loss_ranking = torch.nn.L1Loss()(logit_ranks.cuda().float(), ranks.float())
-                #
-                # lmbda = 0.001
-                # # print("LOSS RANKING:", loss_ranking)
-                # loss = (loss+(lmbda*loss_ranking))/2
-
-
+                loss_fct = RankingLoss(self.args.doc_batching)
+                loss += loss_fct(logits, ranks)
             outputs = (loss,) + outputs
 
             # loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
@@ -390,8 +277,12 @@ def train(args, train_dataset, label_dataset, model, tokenizer):
 
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 else DistributedSampler(train_dataset)
-    # train_dataloader = DataLoader(train_dataset, sampler=None, batch_size=args.train_batch_size)
-    train_dataloader = DataLoader(train_dataset, sampler=None, batch_size=args.n_gpu, collate_fn=my_collate)
+    if args.doc_batching:
+        train_dataloader = DataLoader(train_dataset, sampler=None, batch_size=args.n_gpu, collate_fn=my_collate)
+        train_dataloader = list(train_dataloader)
+    else:
+        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
+
     label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
 
     # for d in train_dataloader:
@@ -443,8 +334,11 @@ def train(args, train_dataset, label_dataset, model, tokenizer):
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
-        # model = torch.nn.DataParallel(model)
-        model = MyDataParallel(model)
+        if args.doc_batching:
+            model = MyDataParallel(model)
+        else:
+            model = torch.nn.DataParallel(model)
+
 
 
     # Distributed training (should be after apex fp16 initialization)
@@ -491,6 +385,8 @@ def train(args, train_dataset, label_dataset, model, tokenizer):
     set_seed(args)  # Added here for reproductibility
 
     for _ in train_iterator:
+        if args.doc_batching:
+            random.shuffle(train_dataloader)
         epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
             # label_data = next(iter(label_dataloader))
@@ -500,13 +396,19 @@ def train(args, train_dataset, label_dataset, model, tokenizer):
                 continue
 
             model.train()
-            # batch = tuple(t.to(args.device) for t in batch)
-            batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
-
+            if args.doc_batching:
+                batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
+                labels = tuple(l[0, :] for l in batch[3])
+                ranks = tuple(r[0, :] for r in batch[-1])
+            else:
+                batch = tuple(t.to(args.device) for t in batch)
+                labels = batch[3]
+                ranks = batch[-1]
 
             # inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3],
             #           "label_desc_input_ids": label_data[0], "label_desc_attention_mask": label_data[1]}
-            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3], "ranks": batch[-1]}
+
+            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labels, "ranks": ranks}
             # print(inputs)
             # inputs = {k: v.reshape(v.shape[1:]) for k, v in inputs.items()}
             # if args.do_ranking_loss:
@@ -605,7 +507,14 @@ def evaluate(args, model, tokenizer, prefix=""):
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
     # Note that DistributedSampler samples randomly
     eval_sampler = SequentialSampler(eval_dataset) if args.local_rank == -1 else DistributedSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+
+    if args.doc_batching:
+        eval_dataloader = DataLoader(eval_dataset, sampler=None, batch_size=1, collate_fn=my_collate)
+    else:
+        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+
+
+
     label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
     model.initialize_label_data(next(iter(label_dataloader)))
 
@@ -622,13 +531,23 @@ def evaluate(args, model, tokenizer, prefix=""):
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
         # label_data = next(iter(label_dataloader))
         model.eval()
-        batch = tuple(t.to(args.device) for t in batch)
+        # batch = tuple(t.to(args.device) for t in batch)
+
+        if args.doc_batching:
+            batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
+        else:
+            batch = tuple(t.to(args.device) for t in batch)
 
         with torch.no_grad():
-
-            # inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3]}
-            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3], "ranks": batch[-1]}
-
+            if args.doc_batching:
+                labs = batch[3][0][0,:]
+                rnks = batch[-1][0][0, :]
+                # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
+                inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs, "ranks": rnks}
+            else:
+                labs = batch[3][0]
+                rnks = batch[-1][0]
+                inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labs, "ranks": rnks}
             outputs = model(**inputs)
             tmp_eval_loss, logits = outputs[:2]
 
@@ -637,18 +556,29 @@ def evaluate(args, model, tokenizer, prefix=""):
 
         if preds is None:
             preds = logits.detach().cpu().numpy()
-            out_label_ids = batch[3].detach().cpu().numpy()
+            if args.doc_batching:
+                out_label_ids = batch[3][0][0,:].detach().cpu().numpy()
+            else:
+                out_label_ids = batch[3][0].detach().cpu().numpy()
         else:
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
             # print(len(preds))
-            out_label_ids = np.append(out_label_ids, batch[3].detach().cpu().numpy(), axis=0)
+            if args.doc_batching:
+                out_label_ids = np.append(out_label_ids, batch[3][0][0,:].detach().cpu().numpy(), axis=0)
+            else:
+                out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
         if len(ids) == 0:
-            ids.append(batch[4].detach().cpu().numpy())
+            ids.append(batch[4][0].detach().cpu().numpy())
         else:
             ids[0] = np.append(
-                ids[0], batch[4].detach().cpu().numpy(), axis=0)
+                ids[0], batch[4][0].detach().cpu().numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
+
+    preds = preds.reshape((len(eval_dataset), args.num_labels))
+    out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
+
+
 
     preds = sigmoid(preds)
 
@@ -660,25 +590,23 @@ def evaluate(args, model, tokenizer, prefix=""):
     preds = (preds > args.prediction_threshold)
 
 
-
-
     result = acc_and_f1(preds, out_label_ids)
     results.update(result)
 
-    n_labels = np.sum(preds, axis=1)
-    preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
 
+
+    n_labels = np.sum(preds, axis=1)
+    # n_labels = np.sum(preds)
+    preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
+    # preds = np.array(sorted_preds_idx[:n_labels])
+    print(preds)
 
     ids = ids[0]
+    ids = np.array([i for i in range(ids[-1]+1)])
 
 
 
-    output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
-    with open(output_eval_file, "w") as writer:
-        logger.info("***** Eval results {} *****".format(prefix))
-        for key in sorted(result.keys()):
-            logger.info("  %s = %s", key, str(result[key]))
-            writer.write("%s = %s\n" % (key, str(result[key])))
+
 
     with open(os.path.join(args.data_dir, "mlb_{}_{}.p".format(args.label_threshold, args.ignore_labelless_docs)),
               "rb") as rf:
@@ -686,6 +614,7 @@ def evaluate(args, model, tokenizer, prefix=""):
     # preds = [mlb.classes_[preds[i, :].astype(bool)].tolist() for i in range(preds.shape[0])]
 
     preds = [mlb.classes_[preds[i][:]].tolist() for i in range(preds.shape[0])]
+    # preds = mlb.classes_[preds[:]].tolist()
 
     id2preds = {val: preds[i] for i, val in enumerate(ids)}
     preds = [id2preds[val] if val in id2preds else [] for i, val in enumerate(ids)]
@@ -706,9 +635,18 @@ def evaluate(args, model, tokenizer, prefix=""):
     #     "{}/preds_development.txt".format(args.output_dir),
     #     "challenge_eval_output.txt"
     # )
-    eval_results = os.popen(eval_cmd).read()
-    print("*** Eval results with challenge script: *** ")
-    print(eval_results)
+
+    output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
+    with open(output_eval_file, "w") as writer:
+        logger.info("***** Eval results {} *****".format(prefix))
+        for key in sorted(result.keys()):
+            logger.info("  %s = %s", key, str(result[key]))
+            writer.write("%s = %s\n" % (key, str(result[key])))
+
+        eval_results = os.popen(eval_cmd).read()
+        print("*** Eval results with challenge script: *** ")
+        print(eval_results)
+        writer.write(eval_results)
 
     return results
 
@@ -905,6 +843,9 @@ def main():
              "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument("--label_threshold", type=int, default=0, help="Exclude labels which occur <= threshold")
+    parser.add_argument("--logit_aggregation", type=str, default='max', help="Whether to aggregate logits by max value "
+                                                                             "or average value. Options:"
+                                                                             "'--max', '--avg'")
     parser.add_argument("--preprocess", action="store_true", help="Whether to do the initial processing of the data.")
     parser.add_argument("--ignore_labelless_docs", action="store_true",
                         help="Whether to ignore the documents which have no labels.")
@@ -934,6 +875,8 @@ def main():
     parser.add_argument('--do_iterative_class_weights', action='store_true', help="Whether to use iteratively "
                                                                                   "calculated class weights")
     parser.add_argument('--do_ranking_loss', action='store_true', help="Whether to use the ranking loss component.")
+    parser.add_argument('--doc_batching', action='store_true', help="Whether to fit one document into a batch during")
+
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
     parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")

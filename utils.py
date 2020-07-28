@@ -163,6 +163,7 @@ def convert_examples_to_features(
         pad_token_segment_id=0,
         mask_padding_with_zero=True,
         label_examples=False,
+        doc_batching=False,
 ):
     """
     Loads a data file into a list of ``InputFeatures``
@@ -196,13 +197,12 @@ def convert_examples_to_features(
 
     features = []
     for (ex_index, example) in enumerate(examples):
-        len_examples = 0
         len_examples = len(examples)
         if ex_index % 10000 == 0:
             logger.info("Writing example %d/%d" % (ex_index, len_examples))
 
         try:
-            if label_examples:
+            if label_examples or not doc_batching:
                 batch = [tokenizer.encode_plus(example.text, add_special_tokens=True, max_length=max_length,)]
             else:
                 max_length = max_length - 2
@@ -329,7 +329,7 @@ def convert_examples_to_features(
         #     print(input_ids[-1])
         # if total_tokens > 2089:
         #     print(sum([bool(i) for i in input_ids[-1]]))
-        if label_examples:
+        if label_examples or doc_batching:
             features.append(
                 InputFeatures(
                     input_ids=input_ids[0],
@@ -390,6 +390,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
             else processor.get_test_examples() if test else processor.get_train_examples()
         label_examples, junk = processor.get_label_desc()
 
+        # doc_examples = doc_examples[:80]
         doc_features = convert_examples_to_features(
             args,
             doc_examples,
@@ -399,6 +400,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
             pad_on_left=bool(args.model_type in ["xlnet"]),  # pad on the left for xlnet
             pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
             pad_token_segment_id=4 if args.model_type in ["xlnet"] else 0,
+            doc_batching=args.doc_batching,
         )
         if label_data:
             label_features = convert_examples_to_features(
@@ -430,15 +432,25 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
     # print("doc ids:", [f.guid for f in doc_features])
     # print("label ranks:", [f.label_ranks for f in doc_features])
 
-    all_input_ids = [torch.tensor(f.input_ids, dtype=torch.long) for f in doc_features]
-    all_attention_mask = [torch.tensor(f.input_mask, dtype=torch.long) for f in doc_features]
-    all_token_type_ids = [torch.tensor(f.segment_ids, dtype=torch.long) for f in doc_features]
-    all_labels = [torch.tensor(f.label_ids, dtype=torch.long) for f in doc_features]
-    all_doc_ids = [torch.tensor(f.guid, dtype=torch.long) for f in doc_features]
-    all_label_ranks = [torch.tensor(f.label_ranks, dtype=torch.long) for f in doc_features]
+    if args.doc_batching:
+        all_input_ids = [torch.tensor(f.input_ids, dtype=torch.long) for f in doc_features]
+        all_attention_mask = [torch.tensor(f.input_mask, dtype=torch.long) for f in doc_features]
+        all_token_type_ids = [torch.tensor(f.segment_ids, dtype=torch.long) for f in doc_features]
+        all_labels = [torch.tensor(f.label_ids, dtype=torch.long) for f in doc_features]
+        all_doc_ids = [torch.tensor(f.guid, dtype=torch.long) for f in doc_features]
+        all_label_ranks = [torch.tensor(f.label_ranks, dtype=torch.long) for f in doc_features]
 
-    doc_dataset = BatchedDataset([all_input_ids, all_attention_mask, all_token_type_ids, all_labels,
-                                all_doc_ids, all_label_ranks])
+        doc_dataset = BatchedDataset([all_input_ids, all_attention_mask, all_token_type_ids, all_labels,
+                                    all_doc_ids, all_label_ranks])
+    else:
+        all_input_ids = torch.tensor([f.input_ids for f in doc_features], dtype=torch.long)
+        all_attention_mask = torch.tensor([f.input_mask for f in doc_features], dtype=torch.long)
+        all_token_type_ids = torch.tensor([f.segment_ids for f in doc_features], dtype=torch.long)
+        all_labels = torch.tensor([f.label_ids for f in doc_features], dtype=torch.long)
+        all_doc_ids = torch.tensor([int(f.guid) for f in doc_features], dtype=torch.long)
+        all_label_ranks = torch.tensor([f.label_ranks for f in doc_features], dtype=torch.long)
+        doc_dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels,
+                                    all_doc_ids, all_label_ranks)
 
     # print("*"*100)
     # print("doc_dataset[0][0].shape", doc_dataset[0][0].shape)
@@ -449,19 +461,6 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
     # print("doc_dataset[5][0].shape", doc_dataset[5][0].shape)
     # print("doc_dataset[6][0].shape", doc_dataset[6][0].shape)
     # print("*"*100)
-
-
-    # Convert to Tensors and build dataset
-    # all_input_ids = torch.tensor([f.input_ids for f in doc_features], dtype=torch.long)
-    # all_attention_mask = torch.tensor([f.input_mask for f in doc_features], dtype=torch.long)
-    # all_token_type_ids = torch.tensor([f.segment_ids for f in doc_features], dtype=torch.long)
-    # all_labels = torch.tensor([f.label_ids for f in doc_features], dtype=torch.long)
-    # all_doc_ids = torch.tensor([int(f.guid) for f in doc_features], dtype=torch.long)
-    # all_label_ranks = torch.tensor([f.label_ranks for f in doc_features], dtype=torch.long)
-    # doc_dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels,
-    #                             all_doc_ids, all_label_ranks)
-
-
     # all_doc_ids = torch.tensor([f.guid for f in eval_features], dtype=torch.long)
 
     if label_data:

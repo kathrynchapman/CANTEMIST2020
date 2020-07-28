@@ -3,6 +3,90 @@
 import torch
 import torch.nn as nn
 
+class RankingLoss(nn.Module):
+    def __init__(self, doc_batching=False):
+        super(RankingLoss, self).__init__()
+        self.doc_batching = doc_batching
+
+    def forward(self, logits, ranks):
+        if self.doc_batching:
+            #############################################################
+            # 1 - apply sigmoid to logits to get probabilities
+            temp = torch.nn.Sigmoid()(logits).cpu()
+            ranks = ranks.cpu()
+
+            n_labels = torch.max(ranks).item()
+
+            # 2 - separate true probs from remaining probs; rank true probs (there are no rankings for negative labels)
+            true_label_probs = torch.flip(
+                temp[torch.argsort(ranks)[-n_labels:]],
+                dims=(0,))  # these are the first n elements of our new array
+            # ^ probabilities of all of the true positive labels, sorted in descending rank order
+
+            remaining_probs = temp[torch.argsort(ranks)[:-n_labels]]
+            # ^ probabilities of all of the true negative labels
+
+            # 3 - check if lowest-ranking true positive probability is higher than all negative class probs
+            lowest_ranking_prob = true_label_probs[-1]
+            highest_remaining_prob = torch.max(remaining_probs)
+
+            temp = lowest_ranking_prob - highest_remaining_prob
+            temp[temp < 0] = 0
+            add_to_loss1 = torch.sum(temp).item()
+
+            # 4 - check that the probabilities are ranked in order
+            vals = self.check_rankings([true_label_probs])
+            try:
+                total_correct = sum(sum(t) for t in vals).item()
+                total_labels = sum(len(t) for t in vals)
+                add_to_loss2 = 1 - (total_correct / total_labels)
+            except:
+                add_to_loss2 = 0
+            # when all ranks are in order, total_correct == total_labels & 1 - 1 = 0; nothing gets added to loss
+        else:
+            #############################################################
+            # 1 - apply sigmoid to logits to get probabilities
+            temp = torch.nn.Sigmoid()(logits).cpu()
+            ranks = ranks.cpu()
+            n_labels = torch.max(ranks, axis=1)[0]  # shape: batch_size -- when not using doc batching
+
+            # 2 - separate true probs from remaining probs; rank true probs (there are no rankings for negative labels)
+            true_label_probs = [torch.flip(temp[r, m], dims=(0,)) for r, m in
+                                enumerate([torch.argsort(ranks)[i, -j:] for i, j in
+                                           enumerate(n_labels)])]  # - when not using doc batching
+            # ^ probabilities of all of the true positive labels, sorted in descending rank order
+
+            remaining_probs = [temp[r, m] for r, m in
+                               enumerate([torch.argsort(ranks)[i, :-j] for i, j in
+                                          enumerate(n_labels)])]  # - when not using doc batching
+            # ^ probabilities of all of the true negative labels
+
+            # 3 - check if lowest-ranking true positive probability is higher than all negative class probs
+            lowest_ranking_probs = torch.Tensor([t[-1] for t in true_label_probs])  # - when not using doc batching
+            highest_remaining_probs = torch.Tensor(
+                [torch.max(t) for t in remaining_probs])  # - when not using doc batching
+
+            temp = lowest_ranking_probs - highest_remaining_probs  # - when not using doc batching
+            temp[temp < 0] = 0
+            add_to_loss1 = torch.sum(temp).item()
+
+            # 4 - check that the probabilities are ranked in order
+            vals = self.check_rankings(true_label_probs)  # - when not using doc batching
+
+            total_correct = sum(sum(t) for t in vals).item()
+            total_labels = sum(len(t) for t in vals)
+            add_to_loss2 = 1 - (total_correct / total_labels)
+            # when all ranks are in order, total_correct == total_labels & 1 - 1 = 0; nothing gets added to loss
+        return add_to_loss1 + add_to_loss2
+
+    def check_rankings(ranking_probs):
+        to_return = []
+        for probs in ranking_probs:
+            while len(probs) > 1:
+                to_return.append(probs[0] > torch.Tensor([probs[i] for i in range(1, len(probs))]))
+                probs = probs[1:]
+        return to_return
+
 
 class BalancedBCEWithLogitsLoss(nn.Module):
     

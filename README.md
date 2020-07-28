@@ -1,2 +1,2 @@
 # CANTEMIST2020
-Repo for CANTEMIST 2020 Shared Task - coding
+# This is the repo for the CANTEMIST 2020 Shared Task - coding
