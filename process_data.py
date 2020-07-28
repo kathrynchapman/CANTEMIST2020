@@ -106,8 +106,8 @@ class CantemistReader():
         self.label_desc_dict['code'] = 'description'
         :return: None
         """
-        with open('Code_Desc_ES/Morfología_7_caracteres.tsv', 'r') as f1, \
-                open('Code_Desc_ES/Morfología_6_caracteres.tsv', 'r') as f2:
+        with open('Code_Desc_ES/Morfología_7_caracteres.tsv', 'r') as f1, \
+                open('Code_Desc_ES/Morfología_6_caracteres.tsv', 'r') as f2:
             dat = f1.read().split('\n')
             dat += f2.read().split('\n')
             dat = [d.strip().split('\t') for d in dat if d]
