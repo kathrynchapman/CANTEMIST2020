@@ -14,7 +14,7 @@ import logging
 import random
 import json
 import argparse
-from loss import BalancedBCEWithLogitsLoss
+from loss import BalancedBCEWithLogitsLoss, RankingLoss
 
 from torch.utils.data import Dataset, RandomSampler, DataLoader, SequentialSampler
 from utils import *
@@ -132,22 +132,22 @@ def acc_and_f1(preds, labels):
 class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
     def __init__(self, config, args='', loss_fct=''):
         super().__init__(config)
-        self.args=args
+        self.args = args
         self.num_labels = args.num_labels
         self.bert = BertModel(config)
+        self.class_weights = torch.ones((self.num_labels,))
+        self.iteration = 1
         self.loss_fct = loss_fct
         self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
         self.classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
-        self.class_weights = torch.ones((self.num_labels,))
-        self.iteration = 1
 
         self.init_weights()
 
     # @add_start_docstrings_to_callable(BERT_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
     def forward(
             self,
-            input_ids=None,
-            attention_mask=None,
+            doc_input_ids=None,
+            doc_attention_mask=None,
             token_type_ids=None,
             position_ids=None,
             head_mask=None,
@@ -205,6 +205,12 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
 
         logits = logits.view(-1, self.num_labels)
 
+        if self.args.doc_batching:
+            if self.args.logit_aggregation == 'max':
+                logits = torch.max(logits, axis=0)[0]
+            elif self.args.logit_aggregation == 'avg':
+                logits = torch.mean(logits, axis=0)
+
 
         # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
         temp = torch.mean(torch.abs(logits.view(-1, self.num_labels)-labels.view(-1, self.num_labels)).float()+1, axis=0)
@@ -247,8 +253,24 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
 
 
         if labels is not None:
+            if self.args.do_iterative_class_weights:
+                # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
+                temp = logits.detach()
+                temp = sigmoid(temp)
+                temp = (temp > self.args.prediction_threshold).float()
+                temp = torch.mean(
+                    torch.abs(temp.view(-1, self.num_labels) - labels.view(-1, self.num_labels)).float() + 1, axis=0)
+                self.class_weights = self.class_weights.cuda()
+
+                self.class_weights *= self.iteration
+                self.class_weights += temp
+                self.class_weights /= (self.iteration + 1)
+                class_weights = self.class_weights.detach()
+            else:
+                class_weights = None
+
             if self.loss_fct == 'bce':
-                loss_fct = BCEWithLogitsLoss(weight=self.class_weights.detach())
+                loss_fct = BCEWithLogitsLoss(weight=class_weights)
             elif self.loss_fct == 'bbce':
                 loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True)
             elif self.loss_fct == 'cel':
@@ -256,41 +278,10 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
             labels = labels.float()
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
 
-            if ranks != None:
-                temp = logits.cpu()
-                ranks = ranks.cpu()
-                # temp = torch.nn.Sigmoid()(logits)
-                n_labels = torch.max(ranks, axis=1)[0]  # shape: batch_size
-
-                # 2 - separate true probs from remaining probs; rank true probs (there are no rankings for negative labels)
-                true_label_probs = [torch.flip(temp[r, m], dims=(0,)) for r, m in
-                                    enumerate([torch.argsort(ranks)[i, -j:] for i, j in enumerate(n_labels)])]
-                # ^ probabilities of all of the true positive labels, sorted in descending rank order
-
-                remaining_probs = [temp[r, m] for r, m in
-                                   enumerate([torch.argsort(ranks)[i, :-j] for i, j in enumerate(n_labels)])]
-                # ^ probabilities of all of the true negative labels
-
-                # 3 - check if lowest-ranking true positive probability is higher than all negative class probs
-                lowest_ranking_probs = torch.Tensor([t[-1] for t in true_label_probs])
-                highest_remaining_probs = torch.Tensor([torch.max(t) for t in remaining_probs])
-                temp = lowest_ranking_probs - highest_remaining_probs
-                temp[temp < 0] = 0
-                add_to_loss1 = torch.sum(temp).item()
-
-                # 4 - check that the probabilities are ranked in order
-                vals = check_rankings(true_label_probs)
-                total_correct = sum(sum(t) for t in vals).item()
-                total_labels = sum(len(t) for t in vals)
-                add_to_loss2 = 1 - (total_correct / total_labels)
-
-                # print('loss main:', loss)
-                loss += add_to_loss1
-                loss += add_to_loss2
-                # print("loss1:", add_to_loss1)
-                # print("loss2:", add_to_loss2)
+            if self.args.do_ranking_loss:
+                loss_fct = RankingLoss(self.args.doc_batching)
+                loss += loss_fct(logits, ranks)
             outputs = (loss,) + outputs
-
             # loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
             # outputs = (loss,) + outputs
         self.iteration += 1
@@ -318,7 +309,11 @@ def train(args, train_dataset, model, tokenizer):
 
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 else DistributedSampler(train_dataset)
-    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
+    if args.doc_batching:
+        train_dataloader = DataLoader(train_dataset, sampler=None, batch_size=args.n_gpu, collate_fn=my_collate)
+        train_dataloader = list(train_dataloader)
+    else:
+        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
 
     if args.max_steps > 0:
         t_total = args.max_steps
@@ -359,7 +354,10 @@ def train(args, train_dataset, model, tokenizer):
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
-        model = torch.nn.DataParallel(model)
+        if args.doc_batching:
+            model = MyDataParallel(model)
+        else:
+            model = torch.nn.DataParallel(model)
 
     # Distributed training (should be after apex fp16 initialization)
     if args.local_rank != -1:
@@ -404,6 +402,8 @@ def train(args, train_dataset, model, tokenizer):
     )
     set_seed(args)  # Added here for reproductibility
     for _ in train_iterator:
+        if args.doc_batching:
+            random.shuffle(train_dataloader)
         epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
 
@@ -413,8 +413,16 @@ def train(args, train_dataset, model, tokenizer):
                 continue
 
             model.train()
-            batch = tuple(t.to(args.device) for t in batch)
-            inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+            if args.doc_batching:
+                batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
+                labels = tuple(l[0, :] for l in batch[3])
+                ranks = tuple(r[0, :] for r in batch[-1])
+            else:
+                batch = tuple(t.to(args.device) for t in batch)
+                labels = batch[3]
+                ranks = batch[-1]
+            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labels, "ranks": ranks}
+            # inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
             outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
 
@@ -505,7 +513,10 @@ def evaluate(args, model, tokenizer, prefix=""):
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
     # Note that DistributedSampler samples randomly
     eval_sampler = SequentialSampler(eval_dataset) if args.local_rank == -1 else DistributedSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+    if args.doc_batching:
+        eval_dataloader = DataLoader(eval_dataset, sampler=None, batch_size=1, collate_fn=my_collate)
+    else:
+        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
 
     # Eval!
     logger.info("***** Running evaluation {} *****".format(prefix))
@@ -521,11 +532,21 @@ def evaluate(args, model, tokenizer, prefix=""):
         batch = tuple(t.to(args.device) for t in batch)
 
         with torch.no_grad():
-            inputs = {'input_ids': batch[0],
-                      'attention_mask': batch[1],
-                      'token_type_ids': batch[2] if args.model_type in ['bert', 'xlnet'] else None,
-                      # XLM and RoBERTa don't use segment_ids
-                      'labels': batch[3]}
+            if args.doc_batching:
+                labs = batch[3][0][0, :]
+                rnks = batch[-1][0][0, :]
+                # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
+                inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs,
+                          "ranks": rnks}
+            else:
+                labs = batch[3][0]
+                rnks = batch[-1][0]
+                inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labs, "ranks": rnks}
+            # inputs = {'input_ids': batch[0],
+            #           'attention_mask': batch[1],
+            #           'token_type_ids': batch[2] if args.model_type in ['bert', 'xlnet'] else None,
+            #           # XLM and RoBERTa don't use segment_ids
+            #           'labels': batch[3]}
 
             #             inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
 
@@ -535,21 +556,44 @@ def evaluate(args, model, tokenizer, prefix=""):
             eval_loss += tmp_eval_loss.mean().item()
         nb_eval_steps += 1
 
+        # if preds is None:
+        #     preds = logits.detach().cpu().numpy()
+        #     out_label_ids = batch[3].detach().cpu().numpy()
+        # else:
+        #     preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
+        #     # print(len(preds))
+        #     out_label_ids = np.append(out_label_ids, batch[3].detach().cpu().numpy(), axis=0)
+        # if len(ids) == 0:
+        #     ids.append(batch[4].detach().cpu().numpy())
+        # else:
+        #     ids[0] = np.append(
+        #         ids[0], batch[4].detach().cpu().numpy(), axis=0)
         if preds is None:
             preds = logits.detach().cpu().numpy()
-            out_label_ids = batch[3].detach().cpu().numpy()
+            if args.doc_batching:
+                out_label_ids = batch[3][0][0,:].detach().cpu().numpy()
+            else:
+                out_label_ids = batch[3][0].detach().cpu().numpy()
         else:
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
             # print(len(preds))
-            out_label_ids = np.append(out_label_ids, batch[3].detach().cpu().numpy(), axis=0)
+            if args.doc_batching:
+                out_label_ids = np.append(out_label_ids, batch[3][0][0,:].detach().cpu().numpy(), axis=0)
+            else:
+                out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
         if len(ids) == 0:
-            ids.append(batch[4].detach().cpu().numpy())
+            ids.append(batch[4][0].detach().cpu().numpy())
         else:
             ids[0] = np.append(
-                ids[0], batch[4].detach().cpu().numpy(), axis=0)
+                ids[0], batch[4][0].detach().cpu().numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
+
+    preds = preds.reshape((len(eval_dataset), args.num_labels)) ### added
+    out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels)) ### added
+
     preds = sigmoid(preds)
+
 
 
     # preds = (preds > args.prediction_threshold).astype(int)
@@ -561,20 +605,21 @@ def evaluate(args, model, tokenizer, prefix=""):
     result = acc_and_f1(preds, out_label_ids)
     results.update(result)
 
+    # n_labels = np.sum(preds, axis=1)
+    # # n_labels = np.sum(preds)
+    # preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
+    # # preds = np.array(sorted_preds_idx[:n_labels])
+
     n_labels = np.sum(preds, axis=1)
     preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
 
 
     ids = ids[0]
+    ids = np.array([i for i in range(ids[-1]+1)])
 
 
 
-    output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
-    with open(output_eval_file, "w") as writer:
-        logger.info("***** Eval results {} *****".format(prefix))
-        for key in sorted(result.keys()):
-            logger.info("  %s = %s", key, str(result[key]))
-            writer.write("%s = %s\n" % (key, str(result[key])))
+
 
     with open(os.path.join(args.data_dir, "mlb_{}_{}.p".format(args.label_threshold, args.ignore_labelless_docs)),
               "rb") as rf:
@@ -602,9 +647,17 @@ def evaluate(args, model, tokenizer, prefix=""):
     #     "{}/preds_development.txt".format(args.output_dir),
     #     "challenge_eval_output.txt"
     # )
-    eval_results = os.popen(eval_cmd).read()
-    print("*** Eval results with challenge script: *** ")
-    print(eval_results)
+
+    output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
+    with open(output_eval_file, "w") as writer:
+        logger.info("***** Eval results {} *****".format(prefix))
+        for key in sorted(result.keys()):
+            logger.info("  %s = %s", key, str(result[key]))
+            writer.write("%s = %s\n" % (key, str(result[key])))
+        eval_results = os.popen(eval_cmd).read()
+        print("*** Eval results with challenge script: *** ")
+        print(eval_results)
+        writer.write(eval_results)
 
     return results
 
@@ -791,6 +844,9 @@ def main():
              "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument("--label_threshold", type=int, default=0, help="Exclude labels which occur <= threshold")
+    parser.add_argument("--logit_aggregation", type=str, default='max', help="Whether to aggregate logits by max value "
+                                                                             "or average value. Options:"
+                                                                             "'--max', '--avg'")
     parser.add_argument("--preprocess", action="store_true", help="Whether to do the initial processing of the data.")
     parser.add_argument("--ignore_labelless_docs", action="store_true",
                         help="Whether to ignore the documents which have no labels.")

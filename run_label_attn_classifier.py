@@ -14,7 +14,7 @@ import logging
 import random
 import json
 import argparse
-from loss import BalancedBCEWithLogitsLoss
+from loss import BalancedBCEWithLogitsLoss, RankingLoss
 import random
 from utils import *
 import scipy.stats as ss
@@ -52,6 +52,7 @@ class ICDDataloader(Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
         # return self.data.iloc[idx,]
+        
 def plackett_luce(some_list):
     for i in range(1,len(some_list)):
         some_list[i] /= np.sum(some_list[i:])
@@ -94,7 +95,6 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         self.label_data = ''
         self.class_weights = torch.ones((self.num_labels,))
         self.iteration = 1
-
         self.loss_fct = loss_fct
         self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
         self.args = args
@@ -198,17 +198,13 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         temp = self.w2(temp)
 
         logits = temp.view(-1, self.num_labels)
-        if self.args.logit_aggregation == 'max':
-            logits = torch.max(logits, axis=0)[0]
-        elif self.args.logit_aggregation == 'avg':
-            logits = torch.mean(logits, axis=0)
+        if self.args.doc_batching:
+            if self.args.logit_aggregation == 'max':
+                logits = torch.max(logits, axis=0)[0]
+            elif self.args.logit_aggregation == 'avg':
+                logits = torch.mean(logits, axis=0)       
+        
         # print("logits.shape:", logits.shape)
-
-
-
-
-
-
         # pooled_output = self.dropout(pooled_output)
         # logits = self.classifier(pooled_output)
 
