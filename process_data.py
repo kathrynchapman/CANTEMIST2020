@@ -118,6 +118,7 @@ class CantemistReader():
         for labels in self.label_dict.values():
             for i, label in enumerate(labels):
                 if not self.label_desc_dict[label]:
+                    print("UMMMMMM??????????????????????????????????????????????????????")
                     label, desc = self.generate_description(label)
                     labels[i] = label
                     self.label_desc_dict[label] = desc
@@ -350,12 +351,6 @@ class CantemistReader():
             label_descs_to_save = [(k, v) for k, v in self.label_desc_dict.items() if k in set(self.mlb.classes_)]
 
             label_descs_to_save = sorted(label_descs_to_save, key=lambda x: list(self.mlb.classes_).index(x[0]))
-
-            print(list(self.mlb.classes_))
-            print([k for k, v in label_descs_to_save])
-
-
-
 
             assert list(self.mlb.classes_) == [k for k, v in label_descs_to_save], print("Sorry, label order mismatch")
 
