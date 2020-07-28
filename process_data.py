@@ -301,7 +301,6 @@ class CantemistReader():
         else:
             self.construct_label_desc_dict()
         for data_type in [self.train_file, self.dev_file, self.test_file]:
-        # for data_type in [self.train_file]:
             file_path = 'processed_data/cantemist/{}.tsv'.format(data_type)
             data = pd.read_csv(file_path, sep='\t', skip_blank_lines=True)
             if data_type == self.test_file:
@@ -351,6 +350,12 @@ class CantemistReader():
             label_descs_to_save = [(k, v) for k, v in self.label_desc_dict.items() if k in set(self.mlb.classes_)]
 
             label_descs_to_save = sorted(label_descs_to_save, key=lambda x: list(self.mlb.classes_).index(x[0]))
+
+            print(list(self.mlb.classes_))
+            print([k for k, v in label_descs_to_save])
+
+
+
 
             assert list(self.mlb.classes_) == [k for k, v in label_descs_to_save], print("Sorry, label order mismatch")
 
