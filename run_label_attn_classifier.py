@@ -238,7 +238,10 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
             elif self.loss_fct == 'cel':
                 loss_fct = CrossEntropyLoss()
             labels = labels.float()
+
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
+
+
             if self.args.do_ranking_loss:
                 loss_fct = RankingLoss(self.args.doc_batching)
                 loss += loss_fct(logits, ranks)
@@ -394,8 +397,11 @@ def train(args, train_dataset, label_dataset, model, tokenizer):
             model.train()
             if args.doc_batching:
                 batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
-                labels = tuple(l[0, :] for l in batch[3])
-                ranks = tuple(r[0, :] for r in batch[-1])
+                # print(batch[3])
+                labels = batch[3]
+                ranks = batch[-1]
+                # labels = tuple(l[0, :] for l in batch[3])
+                # ranks = tuple(r[0, :] for r in batch[-1])
             else:
                 batch = tuple(t.to(args.device) for t in batch)
                 labels = batch[3]
@@ -536,8 +542,12 @@ def evaluate(args, model, tokenizer, prefix=""):
 
         with torch.no_grad():
             if args.doc_batching:
-                labs = batch[3][0][0,:]
-                rnks = batch[-1][0][0, :]
+                # print(batch[3])
+                # labs = batch[3][0][0,:]
+                labs = batch[3][0]
+                # rnks = batch[-1][0][0, :]
+                rnks = batch[-1][0]
+
                 # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
                 inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs, "ranks": rnks}
             else:
@@ -545,6 +555,12 @@ def evaluate(args, model, tokenizer, prefix=""):
                 rnks = batch[-1][0]
                 inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labs, "ranks": rnks}
             outputs = model(**inputs)
+            # try:
+            #     outputs = model(**inputs)
+            # except:
+            #     # print("IDS!!!!!!!!!", batch[4][0])
+            #     # print("IDS!!!!!!!!! - TYPE ", type(batch[4][0][0].item()))
+            #     print("IDS!!!!!!!!!", idx2id[batch[4][0][0].item()])
             tmp_eval_loss, logits = outputs[:2]
 
             eval_loss += tmp_eval_loss.mean().item()
@@ -552,22 +568,27 @@ def evaluate(args, model, tokenizer, prefix=""):
 
         if preds is None:
             preds = logits.detach().cpu().numpy()
-            if args.doc_batching:
-                out_label_ids = batch[3][0][0,:].detach().cpu().numpy()
-            else:
-                out_label_ids = batch[3][0].detach().cpu().numpy()
+            out_label_ids = batch[3][0].detach().cpu().numpy()
+            # if args.doc_batching:
+            #     out_label_ids = batch[3][0][0,:].detach().cpu().numpy()
+            # else:
+            #     out_label_ids = batch[3][0].detach().cpu().numpy()
         else:
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
+            out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
             # print(len(preds))
-            if args.doc_batching:
-                out_label_ids = np.append(out_label_ids, batch[3][0][0,:].detach().cpu().numpy(), axis=0)
-            else:
-                out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
+            # if args.doc_batching:
+            #     out_label_ids = np.append(out_label_ids, batch[3][0][0,:].detach().cpu().numpy(), axis=0)
+            # else:
+            #     out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
         if len(ids) == 0:
-            ids.append(batch[4][0].detach().cpu().numpy())
+            ids.append(batch[4][0].detach().cpu().numpy().item())
         else:
-            ids[0] = np.append(
-                ids[0], batch[4][0].detach().cpu().numpy(), axis=0)
+            if args.doc_batching:
+                ids.append(batch[4][0].detach().cpu().numpy().item())
+            else:
+                ids[0] = np.append(
+                    ids[0], batch[4][0].detach().cpu().numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
 
@@ -595,10 +616,10 @@ def evaluate(args, model, tokenizer, prefix=""):
     # n_labels = np.sum(preds)
     preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
     # preds = np.array(sorted_preds_idx[:n_labels])
-    print(preds)
 
-    ids = ids[0]
-    ids = np.array([i for i in range(ids[-1]+1)])
+    if not args.doc_batching:
+        ids = ids[0]
+    # ids = np.array([i for i in range(ids[-1]+1)])
 
 
 
@@ -625,12 +646,6 @@ def evaluate(args, model, tokenizer, prefix=""):
     eval_cmd = 'python cantemist-evaluation-library/src/main.py -g ' \
                'cantemist/dev-set1-to-publish/cantemist-coding/dev1-coding.tsv -p {}/preds_development.tsv ' \
                '-c cantemist-evaluation-library/valid-codes.tsv -s coding'.format(args.output_dir)
-    # eval_cmd = eval_cmd.format(
-    #     "../CLEF_Datasets_ICD/2019_German/nts-icd_train/ids_development.txt",
-    #     "../CLEF_Datasets_ICD/2019_German/nts-icd_train/anns_train_dev.txt",
-    #     "{}/preds_development.txt".format(args.output_dir),
-    #     "challenge_eval_output.txt"
-    # )
 
     output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
     with open(output_eval_file, "w") as writer:

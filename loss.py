@@ -16,33 +16,35 @@ class RankingLoss(nn.Module):
             ranks = ranks.cpu()
 
             n_labels = torch.max(ranks).item()
+            if n_labels != 0:
+                # 2 - separate true probs from remaining probs; rank true probs (there are no rankings for negative labels)
+                true_label_probs = torch.flip(
+                    temp[torch.argsort(ranks)[-n_labels:]],
+                    dims=(0,))  # these are the first n elements of our new array
+                # ^ probabilities of all of the true positive labels, sorted in descending rank order
 
-            # 2 - separate true probs from remaining probs; rank true probs (there are no rankings for negative labels)
-            true_label_probs = torch.flip(
-                temp[torch.argsort(ranks)[-n_labels:]],
-                dims=(0,))  # these are the first n elements of our new array
-            # ^ probabilities of all of the true positive labels, sorted in descending rank order
+                remaining_probs = temp[torch.argsort(ranks)[:-n_labels]]
+                # ^ probabilities of all of the true negative labels
 
-            remaining_probs = temp[torch.argsort(ranks)[:-n_labels]]
-            # ^ probabilities of all of the true negative labels
+                # 3 - check if lowest-ranking true positive probability is higher than all negative class probs
+                lowest_ranking_prob = true_label_probs[-1]
+                highest_remaining_prob = torch.max(remaining_probs)
 
-            # 3 - check if lowest-ranking true positive probability is higher than all negative class probs
-            lowest_ranking_prob = true_label_probs[-1]
-            highest_remaining_prob = torch.max(remaining_probs)
+                temp = lowest_ranking_prob - highest_remaining_prob
+                temp[temp < 0] = 0
+                add_to_loss1 = torch.sum(temp).item()
 
-            temp = lowest_ranking_prob - highest_remaining_prob
-            temp[temp < 0] = 0
-            add_to_loss1 = torch.sum(temp).item()
-
-            # 4 - check that the probabilities are ranked in order
-            vals = self.check_rankings([true_label_probs])
-            try:
-                total_correct = sum(sum(t) for t in vals).item()
-                total_labels = sum(len(t) for t in vals)
-                add_to_loss2 = 1 - (total_correct / total_labels)
-            except:
-                add_to_loss2 = 0
-            # when all ranks are in order, total_correct == total_labels & 1 - 1 = 0; nothing gets added to loss
+                # 4 - check that the probabilities are ranked in order
+                vals = self.check_rankings([true_label_probs])
+                try:
+                    total_correct = sum(sum(t) for t in vals).item()
+                    total_labels = sum(len(t) for t in vals)
+                    add_to_loss2 = 1 - (total_correct / total_labels)
+                except:
+                    add_to_loss2 = 0
+                # when all ranks are in order, total_correct == total_labels & 1 - 1 = 0; nothing gets added to loss
+            else:
+                add_to_loss1, add_to_loss2 = 0, 0
         else:
             #############################################################
             # 1 - apply sigmoid to logits to get probabilities
@@ -79,7 +81,7 @@ class RankingLoss(nn.Module):
             # when all ranks are in order, total_correct == total_labels & 1 - 1 = 0; nothing gets added to loss
         return add_to_loss1 + add_to_loss2
 
-    def check_rankings(ranking_probs):
+    def check_rankings(self, ranking_probs):
         to_return = []
         for probs in ranking_probs:
             while len(probs) > 1:

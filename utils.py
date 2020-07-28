@@ -5,7 +5,7 @@ import logging
 import torch
 from torch.utils.data import TensorDataset, Dataset
 from itertools import chain
-
+import sys
 
 import string
 
@@ -268,7 +268,6 @@ def convert_examples_to_features(
             print(example)
         input_ids, token_type_ids = [inputs["input_ids"] for inputs in batch], [inputs["token_type_ids"] for inputs in
                                                                                 batch]
-
         # input_ids = [[101, 17160, 10124, 169, 102], [101, 16138, 10454, 11940, 102],
         #               [101, 10142, 11152, 81130, 102], [101, 11127, 106, 102]]
 
@@ -329,7 +328,7 @@ def convert_examples_to_features(
         #     print(input_ids[-1])
         # if total_tokens > 2089:
         #     print(sum([bool(i) for i in input_ids[-1]]))
-        if label_examples or doc_batching:
+        if label_examples or not doc_batching:
             features.append(
                 InputFeatures(
                     input_ids=input_ids[0],
@@ -341,16 +340,29 @@ def convert_examples_to_features(
                 )
             )
         else:
+            # print(label_ids)
+            # print(label_ids * len(input_ids))
+            # sys.exit()
             features.append(
                 InputFeatures(
                     input_ids=input_ids,
                     input_mask=attention_masks,
                     segment_ids=token_type_ids,
-                    label_ids=[label_ids] * len(input_ids),
-                    label_ranks=[label_ranks] * len(input_ids),
-                    guid=[int(example.guid)] * len(input_ids),
+                    label_ids=label_ids,
+                    label_ranks=label_ranks,
+                    guid=int(example.guid),
                 )
             )
+            # features.append(
+            #     InputFeatures(
+            #         input_ids=input_ids,
+            #         input_mask=attention_masks,
+            #         segment_ids=token_type_ids,
+            #         label_ids=[label_ids] * len(input_ids),
+            #         label_ranks=[label_ranks] * len(input_ids),
+            #         guid=[int(example.guid)] * len(input_ids),
+            #     )
+            # )
     # print(features)
     # print(len(features))
     return features
@@ -462,7 +474,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
     # print("doc_dataset[6][0].shape", doc_dataset[6][0].shape)
     # print("*"*100)
     # all_doc_ids = torch.tensor([f.guid for f in eval_features], dtype=torch.long)
-
+    # sys.exit()
     if label_data:
         all_input_ids = torch.tensor([f.input_ids for f in label_features], dtype=torch.long)
         all_attention_mask = torch.tensor([f.input_mask for f in label_features], dtype=torch.long)

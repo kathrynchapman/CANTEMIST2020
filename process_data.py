@@ -106,19 +106,28 @@ class CantemistReader():
         self.label_desc_dict['code'] = 'description'
         :return: None
         """
-        with open('Code_Desc_ES/Morfología_7_caracteres.tsv', 'r') as f1, \
-                open('Code_Desc_ES/Morfología_6_caracteres.tsv', 'r') as f2:
-            dat = f1.read().split('\n')
-            dat += f2.read().split('\n')
-            dat = [d.strip().split('\t') for d in dat if d]
-            for code, desc_long, desc_short in dat:
-                if code != 'codigo':
-                    self.label_desc_dict[code] = desc_long.strip('"')
+        try:
+            with open('Code_Desc_ES/Morfología_7_caracteres.tsv', 'r') as f1, \
+                    open('Code_Desc_ES/Morfología_6_caracteres.tsv', 'r') as f2:
+                dat = f1.read().split('\n')
+                dat += f2.read().split('\n')
+                dat = [d.strip().split('\t') for d in dat if d]
+                for code, desc_long, desc_short in dat:
+                    if code != 'codigo':
+                        self.label_desc_dict[code] = desc_long.strip('"')
+        except:
+            with open('Code_Desc_ES/Morfología_7_caracteres.tsv', 'r') as f1, \
+                    open('Code_Desc_ES/Morfología_6_caracteres.tsv', 'r') as f2:
+                dat = f1.read().split('\n')
+                dat += f2.read().split('\n')
+                dat = [d.strip().split('\t') for d in dat if d]
+                for code, desc_long, desc_short in dat:
+                    if code != 'codigo':
+                        self.label_desc_dict[code] = desc_long.strip('"')
         # now to find the nearest label for those lacking textual descriptions... ugh
         for labels in self.label_dict.values():
             for i, label in enumerate(labels):
                 if not self.label_desc_dict[label]:
-                    print("UMMMMMM??????????????????????????????????????????????????????")
                     label, desc = self.generate_description(label)
                     labels[i] = label
                     self.label_desc_dict[label] = desc
@@ -313,9 +322,6 @@ class CantemistReader():
                 labels_binarized = self.mlb.fit_transform(labels)
             else:
                 labels_binarized = self.mlb.transform(labels)
-
-
-
 
             # print(min(sum(l) for l in labels_binarized))
             # print(max(sum(l) for l in labels_binarized))
