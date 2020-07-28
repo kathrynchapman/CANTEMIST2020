@@ -189,8 +189,8 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
         """
 
         outputs = self.bert(
-            input_ids,
-            attention_mask=attention_mask,
+            doc_input_ids,
+            attention_mask=doc_attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             head_mask=head_mask,
