@@ -536,19 +536,33 @@ def evaluate(args, model, tokenizer, prefix=""):
             batch = tuple(t.to(args.device) for t in batch)
 
         with torch.no_grad():
-            if args.doc_batching:
-                # print(batch[3])
-                # labs = batch[3][0][0,:]
-                labs = batch[3][0]
-                # rnks = batch[-1][0][0, :]
-                rnks = batch[-1][0]
 
-                # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
-                inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs, "ranks": rnks}
+
+            #############################
+            if args.doc_batching:
+                labels = batch[3]
+                ranks = batch[-1]
             else:
-                labs = batch[3][0]
-                rnks = batch[-1][0]
-                inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labs, "ranks": rnks}
+                labels = batch[3]
+                ranks = batch[-1]
+            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labels, "ranks": ranks}
+
+            #############################
+
+
+            # if args.doc_batching:
+            #     # print(batch[3])
+            #     # labs = batch[3][0][0,:]
+            #     labs = batch[3][0]
+            #     # rnks = batch[-1][0][0, :]
+            #     rnks = batch[-1][0]
+            #
+            #     # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
+            #     inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs, "ranks": rnks}
+            # else:
+            #     labs = batch[3][0]
+            #     rnks = batch[-1][0]
+            #     inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labs, "ranks": rnks}
             # inputs = {'input_ids': batch[0],
             #           'attention_mask': batch[1],
             #           'token_type_ids': batch[2] if args.model_type in ['bert', 'xlnet'] else None,
