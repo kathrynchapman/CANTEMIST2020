@@ -415,13 +415,10 @@ def train(args, train_dataset, model, tokenizer):
             model.train()
             if args.doc_batching:
                 batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
-                labels = batch[3]
-                ranks = batch[-1]
             else:
                 batch = tuple(t.to(args.device) for t in batch)
-                labels = batch[3]
-                ranks = batch[-1]
-            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labels, "ranks": ranks}
+
+            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3], "ranks": batch[-1]}
             # inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
             outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)

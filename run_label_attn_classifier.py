@@ -397,20 +397,13 @@ def train(args, train_dataset, label_dataset, model, tokenizer):
             model.train()
             if args.doc_batching:
                 batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
-                # print(batch[3])
-                labels = batch[3]
-                ranks = batch[-1]
-                # labels = tuple(l[0, :] for l in batch[3])
-                # ranks = tuple(r[0, :] for r in batch[-1])
             else:
                 batch = tuple(t.to(args.device) for t in batch)
-                labels = batch[3]
-                ranks = batch[-1]
 
             # inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3],
             #           "label_desc_input_ids": label_data[0], "label_desc_attention_mask": label_data[1]}
 
-            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labels, "ranks": ranks}
+            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3], "ranks": batch[-1]}
             # print(inputs)
             # inputs = {k: v.reshape(v.shape[1:]) for k, v in inputs.items()}
             # if args.do_ranking_loss:
@@ -541,19 +534,31 @@ def evaluate(args, model, tokenizer, prefix=""):
             batch = tuple(t.to(args.device) for t in batch)
 
         with torch.no_grad():
-            if args.doc_batching:
-                # print(batch[3])
-                # labs = batch[3][0][0,:]
-                labs = batch[3][0]
-                # rnks = batch[-1][0][0, :]
-                rnks = batch[-1][0]
 
-                # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
-                inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs, "ranks": rnks}
+
+            #############################
+            if args.doc_batching:
+                labels = batch[3]
+                ranks = batch[-1]
             else:
-                labs = batch[3][0]
-                rnks = batch[-1][0]
-                inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labs, "ranks": rnks}
+                labels = batch[3]
+                ranks = batch[-1]
+            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labels, "ranks": ranks}
+
+            #############################
+            # if args.doc_batching:
+            #     # print(batch[3])
+            #     # labs = batch[3][0][0,:]
+            #     labs = batch[3][0]
+            #     # rnks = batch[-1][0][0, :]
+            #     rnks = batch[-1][0]
+            #
+            #     # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
+            #     inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs, "ranks": rnks}
+            # else:
+            #     labs = batch[3][0]
+            #     rnks = batch[-1][0]
+            #     inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labs, "ranks": rnks}
             outputs = model(**inputs)
             # try:
             #     outputs = model(**inputs)
@@ -567,28 +572,57 @@ def evaluate(args, model, tokenizer, prefix=""):
         nb_eval_steps += 1
 
         if preds is None:
+            # preds = logits.detach().cpu().numpy()
             preds = logits.detach().cpu().numpy()
-            out_label_ids = batch[3][0].detach().cpu().numpy()
-            # if args.doc_batching:
-            #     out_label_ids = batch[3][0][0,:].detach().cpu().numpy()
-            # else:
-            #     out_label_ids = batch[3][0].detach().cpu().numpy()
+            if args.doc_batching:
+                out_label_ids = batch[3][0].detach().cpu().numpy()
+            else:
+                out_label_ids = batch[3].detach().cpu().numpy()
         else:
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-            out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
+            # preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
             # print(len(preds))
-            # if args.doc_batching:
-            #     out_label_ids = np.append(out_label_ids, batch[3][0][0,:].detach().cpu().numpy(), axis=0)
-            # else:
-            #     out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
+            if args.doc_batching:
+                out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
+            else:
+                out_label_ids = np.append(out_label_ids, batch[3].detach().cpu().numpy(), axis=0)
+
         if len(ids) == 0:
-            ids.append(batch[4][0].detach().cpu().numpy().item())
+            if args.doc_batching:
+                ids.append(batch[4][0].detach().cpu().numpy().item())
+            else:
+                ids.append(batch[4].detach().cpu().numpy())
+
         else:
             if args.doc_batching:
                 ids.append(batch[4][0].detach().cpu().numpy().item())
             else:
                 ids[0] = np.append(
-                    ids[0], batch[4][0].detach().cpu().numpy(), axis=0)
+                    ids[0], batch[4].detach().cpu().numpy(), axis=0)
+
+        # if preds is None:
+        #     preds = logits.detach().cpu().numpy()
+        #     out_label_ids = batch[3][0].detach().cpu().numpy()
+        #     # if args.doc_batching:
+        #     #     out_label_ids = batch[3][0][0,:].detach().cpu().numpy()
+        #     # else:
+        #     #     out_label_ids = batch[3][0].detach().cpu().numpy()
+        # else:
+        #     preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
+        #     out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
+        #     # print(len(preds))
+        #     # if args.doc_batching:
+        #     #     out_label_ids = np.append(out_label_ids, batch[3][0][0,:].detach().cpu().numpy(), axis=0)
+        #     # else:
+        #     #     out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
+        # if len(ids) == 0:
+        #     ids.append(batch[4][0].detach().cpu().numpy().item())
+        # else:
+        #     if args.doc_batching:
+        #         ids.append(batch[4][0].detach().cpu().numpy().item())
+        #     else:
+        #         ids[0] = np.append(
+        #             ids[0], batch[4][0].detach().cpu().numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
 
