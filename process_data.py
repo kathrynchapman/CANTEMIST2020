@@ -393,6 +393,7 @@ class CantemistReader():
         if not os.path.exists('processed_data/cantemist/class_weights_{}.p'.format(str(len(self.class_weight_dict)))):
             save('processed_data/cantemist/class_weights_{}.p'.format(str(len(self.class_weight_dict))),
                  class_weights)
+            print("CLASS WEIGHTS SAVED!!!")
 
 
 if __name__ == '__main__':
