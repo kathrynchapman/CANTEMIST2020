@@ -383,17 +383,13 @@ class CantemistReader():
         class_weights = [(k, v) for k, v in self.class_weight_dict.items() if k in set(self.mlb.classes_)]
         class_weights = sorted(class_weights, key=lambda x: list(self.mlb.classes_).index(x[0]))
 
-        for code, weight in class_weights:
-            print(code, '----', weight)
-
         assert list(self.mlb.classes_) == [k for k, v in class_weights], print("Sorry, label order mismatch")
         # we only want the numbers now, not the codes themselves....
         class_weights = [v for c, v in class_weights]
 
         if not os.path.exists('processed_data/cantemist/class_weights_{}.p'.format(str(len(self.class_weight_dict)))):
-            save('processed_data/cantemist/class_weights_{}.p'.format(str(len(self.class_weight_dict))),
+            save('processed_data/cantemist/class_weights_{}.p'.format(str(len(self.mlb.classes_))),
                  class_weights)
-            print("CLASS WEIGHTS SAVED!!!")
 
 
 if __name__ == '__main__':
