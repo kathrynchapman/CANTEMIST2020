@@ -101,6 +101,8 @@ class MyProcessor(DataProcessor):
         self.label_desc_file = os.path.join(args.data_dir, "label_desc_{}.p".format(str(args.label_threshold)))
         self.mlb = pickle_load(
             os.path.join(args.data_dir, "mlb_{}_{}.p".format(str(args.label_threshold), args.ignore_labelless_docs)))
+        self.class_weights = pickle_load(
+            os.path.join(args.data_dir, "class_weights_{}.p".format(str(len(self.mlb.classes_)))))
 
         data = self._read_tsv(self.train_file)
         y = np.array([i[-1] for i in data])

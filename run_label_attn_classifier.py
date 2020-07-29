@@ -228,6 +228,8 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
                 self.class_weights += temp
                 self.class_weights /= (self.iteration + 1)
                 class_weights = self.class_weights.detach()
+            elif self.args.do_normal_class_weights:
+                pass
             else:
                 class_weights = None
 
@@ -918,6 +920,8 @@ def main():
     )
     parser.add_argument('--make_plots', action='store_true', help="Whether to make plots on data.")
     parser.add_argument('--do_iterative_class_weights', action='store_true', help="Whether to use iteratively "
+                                                                                  "calculated class weights")
+    parser.add_argument('--do_normal_class_weights', action='store_true', help="Whether to use normally "
                                                                                   "calculated class weights")
     parser.add_argument('--do_ranking_loss', action='store_true', help="Whether to use the ranking loss component.")
     parser.add_argument('--doc_batching', action='store_true', help="Whether to fit one document into a batch during")

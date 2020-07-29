@@ -42,7 +42,7 @@ class CantemistReader():
         self.args = args
         self.label_desc_dict = defaultdict(str)
         self.span_dict = defaultdict(list)
-
+        self.class_weight_dict = defaultdict(int)
         self.train_file = 'train_{}_{}'.format(self.args.label_threshold, self.args.ignore_labelless_docs)
         self.dev_file = 'dev_{}_{}'.format(self.args.label_threshold, self.args.ignore_labelless_docs)
         self.test_file = 'test_{}_{}'.format(self.args.label_threshold, self.args.ignore_labelless_docs)
@@ -81,6 +81,7 @@ class CantemistReader():
         :param train_or_test: str: 'train', 'test'; for finding the proper directory
         :return: None
         """
+
         if train:
             path = self.train_path + 'cantemist-coding/train-coding.tsv'
             id_list = self.train_ids
@@ -93,7 +94,10 @@ class CantemistReader():
                     doc_id, label = line.split('\t')
                     if doc_id == 'file':
                         continue
+                    if label == '90800/1':
+                        label = '9080/1'
                     self.label_dict[doc_id].append(label)
+                    self.class_weight_dict[label] += 1
                     if doc_id not in id_list:
                         id_list.append(doc_id)
                 except:
@@ -349,34 +353,46 @@ class CantemistReader():
             #     print(two.tolist())
             #     print('_'*100)
 
-
-
-
-
-
-            label_descs_to_save = [(k, v) for k, v in self.label_desc_dict.items() if k in set(self.mlb.classes_)]
-
-            label_descs_to_save = sorted(label_descs_to_save, key=lambda x: list(self.mlb.classes_).index(x[0]))
-
-            assert list(self.mlb.classes_) == [k for k, v in label_descs_to_save], print("Sorry, label order mismatch")
-
             if data_type == self.test_file:
                 data = [(data.iloc[idx, 0], data.iloc[idx, 1], None, None) for idx in range(len(data))]
             else:
                 data = [(data.iloc[idx, 0], data.iloc[idx, 1], labels_binarized[idx, :], labels_ranked[idx,:]) for idx in range(len(data))]
-            # print(data)
-
             save('processed_data/cantemist/{}.p'.format(data_type), data)
             if not os.path.exists('processed_data/cantemist/mlb_{}_{}.p'.format(self.args.label_threshold,
                                                                                 self.args.ignore_labelless_docs)):
                 save('processed_data/cantemist/mlb_{}_{}.p'.format(self.args.label_threshold,
                                                                    self.args.ignore_labelless_docs),
                      self.mlb)
-            if not os.path.exists('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold,
-                                                                                    self.args.ignore_labelless_docs)):
-                save('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold,
-                                                                       self.args.ignore_labelless_docs),
-                     label_descs_to_save)
+
+
+        # get the label descriptions to save and make sure they're in the same order as the binarized labels
+        label_descs_to_save = [(k, v) for k, v in self.label_desc_dict.items() if k in set(self.mlb.classes_)]
+
+        label_descs_to_save = sorted(label_descs_to_save, key=lambda x: list(self.mlb.classes_).index(x[0]))
+
+        assert list(self.mlb.classes_) == [k for k, v in label_descs_to_save], print("Sorry, label order mismatch")
+
+        if not os.path.exists('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold)):
+            save('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold),
+                 label_descs_to_save)
+
+        # get class weights
+        abs_total_labels = sum(self.class_weight_dict.values())
+        self.class_weight_dict = {k: abs_total_labels / v for k, v in self.class_weight_dict.items()}
+        # and make sure they're in order according to the binarized labels....
+        class_weights = [(k, v) for k, v in self.class_weight_dict.items() if k in set(self.mlb.classes_)]
+        class_weights = sorted(class_weights, key=lambda x: list(self.mlb.classes_).index(x[0]))
+
+        for code, weight in class_weights:
+            print(code, '----', weight)
+
+        assert list(self.mlb.classes_) == [k for k, v in class_weights], print("Sorry, label order mismatch")
+        # we only want the numbers now, not the codes themselves....
+        class_weights = [v for c, v in class_weights]
+
+        if not os.path.exists('processed_data/cantemist/class_weights_{}.p'.format(str(len(self.class_weight_dict)))):
+            save('processed_data/cantemist/class_weights_{}.p'.format(str(len(self.class_weight_dict))),
+                 class_weights)
 
 
 if __name__ == '__main__':
