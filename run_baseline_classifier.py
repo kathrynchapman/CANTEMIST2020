@@ -613,7 +613,7 @@ def evaluate(args, model, tokenizer, prefix=""):
             if args.doc_batching:
                 ids.append(batch[4][0].detach().cpu().numpy().item())
             else:
-                ids.append(batch[4].detach().cpu().numpy().item())
+                ids.append(batch[4].detach().cpu().numpy())
 
         else:
             if args.doc_batching:
