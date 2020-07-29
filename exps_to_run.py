@@ -23,6 +23,8 @@ def get_input(ref_type, str_type):
     invalid = True
     while invalid:
         inp = input("\nEnter {}, [{}]: ".format(str_type, ', '.join(ref_type)))
+        if inp == 'exit':
+            return inp
         try:
             inp_type = ref_type[int(inp) - 1]
             print("You entered ", inp_type)
@@ -37,28 +39,43 @@ def get_input(ref_type, str_type):
 def fill_dict(exp_dict):
     done = False
     while not done:
-        model_type = get_input(models, 'model type')
-        n_eps = get_input(num_epohcs, 'number epochs')
-        doc_batches = get_input(doc_batching, 'doc batching')
-        rank_loss = get_input(ranking_loss, 'ranking loss')
-        cls_wts = get_input(class_weights, 'class weights')
-        loss_fct = get_input(loss_function, 'loss function')
+        ref_type = [models, num_epohcs, doc_batching, ranking_loss, class_weights, loss_function]
+        str_type = ['model type', 'number epochs', 'doc batching', 'ranking loss', 'class weights', 'loss function']
+        inputs = []
+        for r_type, s_type in zip(ref_type, str_type):
+            inp = get_input(r_type, s_type)
+            if inp == 'exit':
+                done = True
+                break
+            else:
+                inputs.append(inp)
+        if done == True:
+            break
 
-        if exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['MAP']:
+
+        # model_type = get_input(models, 'model type')
+        # n_eps = get_input(num_epohcs, 'number epochs')
+        # doc_batches = get_input(doc_batching, 'doc batching')
+        # rank_loss = get_input(ranking_loss, 'ranking loss')
+        # cls_wts = get_input(class_weights, 'class weights')
+        # loss_fct = get_input(loss_function, 'loss function')
+
+        if exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['MAP']:
             valid = False
-            while not valid:
-                cont = input("You already have an entry for this - do you want to continue and overwrite? [y, n, just notes]: ")
-                if cont not in ['y', 'n', 'just notes'.strip()]:
-                    print("Sorry, didn't get that...")
-                else:
-                    valid = True
-            if cont == 'n':
-                continue
-            elif cont == 'just notes':
-                notes = input("Just type the notes here: ")
-                exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['Notes'] = notes
-                save(exp_dict, 'exp_dict.p')
-                continue
+        while not valid:
+            cont = input(
+                "You already have an entry for this - do you want to continue and overwrite? [y, n, just notes]: ")
+            if cont not in ['y', 'n', 'just notes'.strip()]:
+                print("Sorry, didn't get that...")
+            else:
+                valid = True
+        if cont == 'n':
+            continue
+        elif cont == 'just notes':
+            notes = input("Just type the notes here: ")
+            exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes
+            save(exp_dict, 'exp_dict.p')
+            continue
 
 
         MAP = input("Enter MAP: ")
@@ -67,14 +84,12 @@ def fill_dict(exp_dict):
         R = input("Enter R: ")
         notes = input("Any notes on this? (Just type them if so): ")
 
-
-
-        exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['MAP'] = float(MAP)
-        exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['F1'] = float(F1)
-        exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['P'] = float(P)
-        exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['R'] = float(R)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['MAP'] = float(MAP)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['F1'] = float(F1)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['P'] = float(P)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['R'] = float(R)
         if notes:
-            exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['Notes'] = notes
+            exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes
 
         save(exp_dict, 'exp_dict.p')
         done = True if input("Do you have another experiment to enter? [y, n]: ") == 'n' else False
