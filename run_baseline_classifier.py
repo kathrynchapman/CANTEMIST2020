@@ -610,15 +610,17 @@ def evaluate(args, model, tokenizer, prefix=""):
             #     out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
 
         if len(ids) == 0:
-            print("batch[4]", batch[4])
-            print("batch[4][0]", batch[4][0])
-            ids.append(batch[4][0].detach().cpu().numpy().item())
+            if args.doc_batching:
+                ids.append(batch[4][0].detach().cpu().numpy().item())
+            else:
+                ids.append(batch[4].detach().cpu().numpy().item())
+
         else:
             if args.doc_batching:
                 ids.append(batch[4][0].detach().cpu().numpy().item())
             else:
                 ids[0] = np.append(
-                    ids[0], batch[4][0].detach().cpu().numpy(), axis=0)
+                    ids[0], batch[4].detach().cpu().numpy(), axis=0)
 
 
     eval_loss = eval_loss / nb_eval_steps
