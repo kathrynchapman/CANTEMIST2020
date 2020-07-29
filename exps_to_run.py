@@ -8,12 +8,13 @@ models = ['baseline', 'label_attention']
 
 num_epohcs = ['any int']
 
-doc_batching = ['doc_batching_max', 'doc_batching_avg', 'no_doc_batching']
+# doc_batching = ['doc_batching_max', 'doc_batching_avg', 'no_doc_batching']
+doc_batching = ['doc_batching_max', 'no_doc_batching']
 
 ranking_loss = ['ranking_loss', 'no_ranking_loss']
 
-class_weights = ['dynamic_class_weights', 'static_class_weights', 'no_class_weights']
-
+# class_weights = ['dynamic_class_weights', 'static_class_weights', 'no_class_weights']
+class_weights = ['class_weights', 'no_class_weights']
 loss_function = ['bce', 'bbce']
 
 
@@ -131,10 +132,10 @@ def viewall(exp_dict):
                             r = exp_dict[m][n_ep][db][rl][cw][lf]['R']
                             notes = exp_dict[m][n_ep][db][rl][cw][lf]['Notes']
                             m_ = ' label  attn ' if m == 'label_attention' else m
-                            r = 'Y' if rl == 'ranking_loss' else 'N'
+                            rl_ = 'Y' if rl == 'ranking_loss' else 'N'
                             d = 'N' if db == 'no_doc_batching' else db[-3:]
                             c = 'N' if cw == 'no_class_weights' else cw
-                            table.rows.append([m_, n_ep, d, r, c, lf, map, f1, p, r, notes])
+                            table.rows.append([m_, n_ep, d, rl_, c, lf, map, f1, p, r, notes])
     print(table)
                             # print("Results for {}, {}, {}, {}, {}, {}".format(m, n_ep, db, rl, cw, lf))
                             # print("MAP:", exp_dict[m][n_ep][db][rl][cw][lf]['MAP'])
@@ -169,12 +170,12 @@ if __name__=='__main__':
         elif to_do not in ['1', '2', '3']:
             finished = True
 
-    # print("######################################## Experiments to Run ########################################")
-    # for m in models:
-    #     for n_ep in num_epohcs:
-    #         for db in doc_batching:
-    #             for rl in ranking_loss:
-    #                 for cw in class_weights:
-    #                     for lf in loss_function:
-    #                         if not exp_dict[m][n_ep][db][rl][cw][lf]['MAP']:
-    #                             print(m + '\t' + n_ep + '\t' + db + '\t' + rl + '\t' + cw + '\t' + lf)
+    print("######################################## Experiments to Run ########################################")
+    for m in models:
+        for n_ep in num_epohcs:
+            for db in doc_batching:
+                for rl in ranking_loss:
+                    for cw in class_weights:
+                        for lf in loss_function:
+                            if not exp_dict[m][n_ep][db][rl][cw][lf]['MAP']:
+                                print(m + '\t' + n_ep + '\t' + db + '\t' + rl + '\t' + cw + '\t' + lf)
