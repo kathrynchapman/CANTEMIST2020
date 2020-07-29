@@ -539,8 +539,8 @@ def evaluate(args, model, tokenizer, prefix=""):
             if args.doc_batching:
                 input_ids = batch[0][0]
                 attn_mask = batch[1][0]
-                labels = batch[3]
-                ranks = batch[-1]
+                labels = batch[3][0]
+                ranks = batch[-1][0]
             else:
                 input_ids = batch[0]  # may need to fix this!
                 attn_mask = batch[1]  # may need to fix this!
