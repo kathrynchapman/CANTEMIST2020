@@ -13,8 +13,8 @@ doc_batching = ['doc_batching_max', 'no_doc_batching']
 
 ranking_loss = ['ranking_loss', 'no_ranking_loss']
 
-# class_weights = ['dynamic_class_weights', 'static_class_weights', 'no_class_weights']
-class_weights = ['class_weights', 'no_class_weights']
+class_weights = ['dynamic_class_weights', 'static_class_weights', 'no_class_weights']
+# class_weights = ['class_weights', 'no_class_weights']
 loss_function = ['bce', 'bbce']
 
 

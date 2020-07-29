@@ -232,7 +232,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
                 self.class_weights /= (self.iteration + 1)
                 class_weights = self.class_weights.detach()
             elif self.args.do_normal_class_weights:
-                class_weights =  self.class_weights
+                class_weights = torch.Tensor(self.class_weights).cuda()
             else:
                 class_weights = None
 
