@@ -380,7 +380,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
         "cached_{}_{}_{}_{}_{}".format(
             'dev' if evaluate else 'test' if test else 'train',
             list(filter(None, args.model_name_or_path.split("/"))).pop(),
-            str(args.doc_max_seq_length), str(args.label_threshold), str(args.ignore_labelless_docs)
+            str(args.doc_max_seq_length), str(args.label_threshold), str(args.doc_batching)
         ),
     )
     if label_data:
@@ -437,13 +437,6 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
     if args.local_rank == 0 and not evaluate:
         torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-    # print("input ids:", [len(f.input_ids) for f in doc_features])
-    # print("input mask:", [f.input_mask for f in doc_features])
-    # print("segment ids:", [f.segment_ids for f in doc_features])
-    # print("label ids:", [f.label_ids for f in doc_features])
-    # print("doc ids:", [f.guid for f in doc_features])
-    # print("label ranks:", [f.label_ranks for f in doc_features])
-
     if args.doc_batching:
         all_input_ids = [torch.tensor(f.input_ids, dtype=torch.long) for f in doc_features]
         all_attention_mask = [torch.tensor(f.input_mask, dtype=torch.long) for f in doc_features]
@@ -464,17 +457,6 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
         doc_dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels,
                                     all_doc_ids, all_label_ranks)
 
-    # print("*"*100)
-    # print("doc_dataset[0][0].shape", doc_dataset[0][0].shape)
-    # print("doc_dataset[1][0].shape", doc_dataset[1][0].shape)
-    # print("doc_dataset[2][0].shape", doc_dataset[2][0].shape)
-    # print("doc_dataset[3][0].shape", doc_dataset[3][0].shape)
-    # print("doc_dataset[4][0].shape", doc_dataset[4][0].shape)
-    # print("doc_dataset[5][0].shape", doc_dataset[5][0].shape)
-    # print("doc_dataset[6][0].shape", doc_dataset[6][0].shape)
-    # print("*"*100)
-    # all_doc_ids = torch.tensor([f.guid for f in eval_features], dtype=torch.long)
-    # sys.exit()
     if label_data:
         all_input_ids = torch.tensor([f.input_ids for f in label_features], dtype=torch.long)
         all_attention_mask = torch.tensor([f.input_mask for f in label_features], dtype=torch.long)
