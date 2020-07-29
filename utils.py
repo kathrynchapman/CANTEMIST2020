@@ -126,6 +126,9 @@ class MyProcessor(DataProcessor):
     def get_labels(self):
         return self.mlb.classes_.tolist()
 
+    def get_class_weights(self):
+        return self.class_weights
+
     def _create_examples(self, data, data_type=''):
         examples = []
         idx2id = {}

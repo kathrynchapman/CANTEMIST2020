@@ -130,12 +130,15 @@ def acc_and_f1(preds, labels):
 #         return outputs
 
 class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
-    def __init__(self, config, args='', loss_fct=''):
+    def __init__(self, config, args='', loss_fct='', class_weights=None):
         super().__init__(config)
         self.args = args
         self.num_labels = args.num_labels
         self.bert = BertModel(config)
-        self.class_weights = torch.ones((self.num_labels,))
+        if not class_weights:
+            self.class_weights = torch.ones((self.num_labels,))
+        else:
+            self.class_weights = class_weights
         self.iteration = 1
         self.loss_fct = loss_fct
         self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
@@ -215,15 +218,6 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
         # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
         temp = torch.mean(torch.abs(logits.view(-1, self.num_labels)-labels.view(-1, self.num_labels)).float()+1, axis=0)
 
-
-        self.class_weights = self.class_weights.cuda()
-
-        self.class_weights *= self.iteration
-        self.class_weights += temp
-        self.class_weights /= (self. iteration + 1)
-
-
-
         outputs = (logits,) + outputs[2:]  # add hidden states and attention if they are here
 
         # #############
@@ -249,9 +243,6 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
         # logits = temp.view(-1, self.num_labels)
         #
         # ############
-
-
-
         if labels is not None:
             if self.args.do_iterative_class_weights:
                 # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
@@ -267,7 +258,7 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 self.class_weights /= (self.iteration + 1)
                 class_weights = self.class_weights.detach()
             elif self.args.do_normal_class_weights:
-                pass
+                class_weights = self.class_weights
             else:
                 class_weights = None
 
@@ -304,7 +295,7 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 
-def train(args, train_dataset, model, tokenizer):
+def train(args, train_dataset, model, tokenizer, class_weights):
     """ Train the model """
     if args.local_rank in [-1, 0]:
         tb_writer = SummaryWriter()
@@ -1031,6 +1022,7 @@ def main():
         # german_reader.process_data()
         processor = MyProcessor(args)
 
+    class_weights = processor.get_class_weights()
     label_list = processor.get_labels()
     num_labels = len(label_list)
     args.num_labels = num_labels
@@ -1081,7 +1073,7 @@ def main():
     # Training
     if args.do_train:
         train_dataset, idx2id = load_and_cache_examples(args, tokenizer, evaluate=False)
-        global_step, tr_loss = train(args, train_dataset, model, tokenizer)
+        global_step, tr_loss = train(args, train_dataset, model, tokenizer, class_weights)
         logger.info(" global_step = %s, average loss = %s", global_step, tr_loss)
 
     # Saving best-practices: if you use defaults names for the model, you can reload it using from_pretrained()
