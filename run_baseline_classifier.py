@@ -247,7 +247,7 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
             if self.args.do_iterative_class_weights:
                 # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
                 temp = logits.detach()
-                temp = sigmoid(temp)
+                temp = torch.nn.Sigmoid()(temp)
                 temp = (temp > self.args.prediction_threshold).float()
                 temp = torch.mean(
                     torch.abs(temp.view(-1, self.num_labels) - labels.view(-1, self.num_labels)).float() + 1, axis=0)

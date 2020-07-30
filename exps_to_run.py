@@ -41,6 +41,7 @@ def fill_dict(exp_dict):
     blah = 'a'
     done = False
     while not done:
+        add_to_notes = ''
         now = datetime.now()
         dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
         ref_type = [models, num_epohcs, doc_batching, ranking_loss, class_weights, loss_function]
@@ -73,6 +74,8 @@ def fill_dict(exp_dict):
                     valid = True
             if cont == 'n' or cont == '2':
                 continue
+            elif cont == 'y' or cont == '1':
+                add_to_notes = " (last edited {})".format(dt_string)
             elif cont == 'just notes' or cont == '3':
                 notes = input("Just type the notes here: ")
                 if notes == 'exit':
@@ -81,6 +84,7 @@ def fill_dict(exp_dict):
                                                                             " (last edited {})".format(dt_string)
                 save(exp_dict, 'exp_dict.p')
                 continue
+
 
         MAP = input("Enter MAP: ")
         F1 = input("Enter F1: ")
@@ -95,8 +99,8 @@ def fill_dict(exp_dict):
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Entry Date'] = dt_string
 
 
-        if notes:
-            exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes
+        if notes or add_to_notes:
+            exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes + add_to_notes
 
         save(exp_dict, 'exp_dict.p')
         done = True if input("Do you have another experiment to enter? [y, n]: ") == 'n' else False
@@ -170,7 +174,7 @@ def viewall(exp_dict):
                             # print("R:", exp_dict[m][n_ep][db][rl][cw][lf]['R'])
 
 
-def delete(exp_dict):
+def delete(exp_dict, backup_dict):
     """
     implement a delete function
     :param exp_dict:
@@ -180,7 +184,33 @@ def delete(exp_dict):
     # exp_dict['label_attention']['45']['doc_batching_max']['ranking_loss'].pop('class_weights')
     # viewall(exp_dict)
     # save(exp_dict, 'exp_dict.p')
-    pass
+    blah = 'a'
+    done = False
+    while not done:
+        add_to_notes = ''
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+        ref_type = [models, num_epohcs, doc_batching, ranking_loss, class_weights, loss_function]
+        str_type = ['model type', 'number epochs', 'doc batching', 'ranking loss', 'class weights', 'loss function']
+        inputs = []
+        for r_type, s_type in zip(ref_type, str_type):
+            inp = get_input(r_type, s_type)
+            if inp == 'exit':
+                blah = True
+                break
+            else:
+                inputs.append(inp)
+        if blah == True:
+            break
+
+
+        to_delete = exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]].pop(inputs[5])
+        backup_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]] = to_delete
+        save(exp_dict, 'exp_dict.p')
+        save(backup_dict, 'backup.p')
+        done = input("Do you have another entry to delete? [y, n] ")
+        done = True if done == 'y' else False
+
 
 
 if __name__=='__main__':
@@ -197,13 +227,26 @@ if __name__=='__main__':
 
     finished = False
     while not finished:
-        to_do = input("Enter new data, look up existing data, or view all existing data? [1, 2, 3] ")
+        to_do = input("Enter new data, look up existing data, view all existing data, or delete an entry? [1, 2, 3, 4] ")
         if to_do == '1':
             fill_dict(exp_dict)
         elif to_do == '2':
             lookup(exp_dict)
         elif to_do == '3':
             viewall(exp_dict)
+        elif to_do == '4':
+            try:
+                backup_dict = load('backup.p')
+            except:
+                backup_dict = defaultdict(
+                    partial(defaultdict,
+                    partial(defaultdict,
+                    partial(defaultdict,
+                    partial(defaultdict,
+                    partial(defaultdict,
+                    partial(defaultdict, float)))))))
+            print(backup_dict)
+            delete(exp_dict, backup_dict)
         elif to_do not in ['1', '2', '3']:
             finished = True
 
