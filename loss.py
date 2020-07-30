@@ -57,15 +57,15 @@ class RankingLoss(nn.Module):
 
             # 2 - separate true probs from remaining probs; rank true probs (there are no rankings for negative labels)
             true_label_probs = [torch.flip(temp[r, m], dims=(0,)) for r, m in
-                                enumerate([torch.argsort(ranks)[i, -j:] if j >0 else torch.argsort(ranks)[i,:] for i, j in
+                                enumerate([torch.argsort(ranks)[i, -j:] for i, j in
                                            enumerate(n_labels) ])]  # - when not using doc batching
             # ^ probabilities of all of the true positive labels, sorted in descending rank order
 
             remaining_probs = [temp[r, m] for r, m in
-                               enumerate([torch.argsort(ranks)[i, :-j] for i, j in
+                               enumerate([torch.argsort(ranks)[i, :-j] if j>0 else torch.argsort(ranks)[i, :]  for i, j in
                                           enumerate(n_labels)])]  # - when not using doc batching
             # ^ probabilities of all of the true negative labels
-            print(remaining_probs)
+
             # 3 - check if lowest-ranking true positive probability is higher than all negative class probs
             lowest_ranking_probs = torch.Tensor([t[-1] for t in true_label_probs])  # - when not using doc batching
 
