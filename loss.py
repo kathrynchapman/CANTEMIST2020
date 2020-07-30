@@ -115,7 +115,7 @@ class BalancedBCEWithLogitsLoss(nn.Module):
 
             # weighted_loss = torch.matmul(weighted_targets, log_s_logits) + torch.matmul(one_minus_targets, log_one_minus_s_logits)
             weighted_loss = (weighted_targets * log_s_logits) + (one_minus_targets * log_one_minus_s_logits)
-            assert weighted_loss == logits
+            assert weighted_loss.shape == logits.shape
             print(weighted_loss)
 
 
