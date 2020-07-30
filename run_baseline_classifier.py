@@ -273,7 +273,7 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 loss_fct = CrossEntropyLoss()
 
             if self.loss_fct != 'none':
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
+                loss = loss_fct(logits.view(-1, self.num_labels), ranks.view(-1, self.num_labels))
             else:
                 loss = 0
 
