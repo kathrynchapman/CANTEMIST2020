@@ -251,7 +251,7 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 temp = (temp > self.args.prediction_threshold).float()
                 temp = torch.mean(
                     torch.abs(temp.view(-1, self.num_labels) - labels.view(-1, self.num_labels)).float() + 1, axis=0)
-                self.class_weights = self.class_weights.cuda()
+                self.class_weights = torch.Tensor(self.class_weights).cuda()
 
                 self.class_weights *= self.iteration
                 self.class_weights += temp
