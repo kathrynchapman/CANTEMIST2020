@@ -254,7 +254,7 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 try:
                     self.class_weights = torch.Tensor(self.class_weights).cuda()
                 except:
-                    self.class_weights = torch.Tensor(self.class_weights)
+                    pass
                 self.class_weights *= self.iteration
                 self.class_weights += temp
                 self.class_weights /= (self.iteration + 1)
