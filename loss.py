@@ -107,7 +107,7 @@ class BalancedBCEWithLogitsLoss(nn.Module):
             # then we have class weights to make use of
             s_logits = torch.nn.Sigmoid()(logits)
             log_s_logits = torch.log(s_logits)
-            weighted_targets = weights * labels
+            weighted_targets = self.weights * labels
 
 
             one_minus_targets = 1 - labels
