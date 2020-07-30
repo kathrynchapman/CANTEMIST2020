@@ -47,6 +47,7 @@ class CantemistReader():
         self.dev_file = 'dev_{}_{}'.format(self.args.label_threshold, self.args.ignore_labelless_docs)
         self.test_file = 'test_{}_{}'.format(self.args.label_threshold, self.args.ignore_labelless_docs)
         self.n_disc_docs = 0
+        self.total_labeled_docs = 0
         if not os.path.exists('processed_data/cantemist/'):
             os.mkdir('processed_data/cantemist/')
 
@@ -97,7 +98,8 @@ class CantemistReader():
                     if label == '90800/1':
                         label = '9080/1'
                     self.label_dict[doc_id].append(label)
-                    self.class_weight_dict[label] += 1
+                    if train == True:
+                        self.class_weight_dict[label] += 1
                     if doc_id not in id_list:
                         id_list.append(doc_id)
                 except:
@@ -377,8 +379,8 @@ class CantemistReader():
                  label_descs_to_save)
 
         # get class weights
-        abs_total_labels = sum(self.class_weight_dict.values())
-        self.class_weight_dict = {k: abs_total_labels / v for k, v in self.class_weight_dict.items()}
+        total_train_docs = len(self.train_ids)
+        self.class_weight_dict = {k: (total_train_docs-v) / v for k, v in self.class_weight_dict.items()}
         # and make sure they're in order according to the binarized labels....
         class_weights = [(k, v) for k, v in self.class_weight_dict.items() if k in set(self.mlb.classes_)]
         class_weights = sorted(class_weights, key=lambda x: list(self.mlb.classes_).index(x[0]))
