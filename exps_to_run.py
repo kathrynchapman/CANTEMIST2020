@@ -7,13 +7,19 @@ from datetime import datetime
 
 models = ['baseline', 'label_attention']
 num_epohcs = ['any int']
-doc_batching = ['doc_batching_max', 'no_doc_batching']
-ranking_loss = ['ranking_loss', 'no_ranking_loss', 'weighted_ranking_loss']
-class_weights = ['dynamic_class_weights', 'static_class_weights', 'no_class_weights']
-loss_function = ['bce', 'bbce', 'none']
+doc_batching = ['no_doc_batching', 'doc_batching_max']
+ranking_loss = ['no_ranking_loss', 'ranking_loss', 'weighted_ranking_loss']
+class_weights = ['no_class_weights, ''dynamic_class_weights', 'static_class_weights']
+loss_function = ['bce', 'bbce', 'none', 'bce ranks', 'bbce ranks']
 
 
 def get_input(ref_type, str_type):
+    """
+    Gets all of the deets to for an entry (to add, to delete, etc)
+    :param ref_type: list; all of the options for that parameter
+    :param str_type: str; basically the name of the ref type
+    :return: inp_type: str; the data
+    """
     invalid = True
     while invalid:
         inp = input("\nEnter {}, [{}]: ".format(str_type, ', '.join(ref_type)))
@@ -32,6 +38,11 @@ def get_input(ref_type, str_type):
 
 
 def fill_dict(exp_dict):
+    """
+    Builds the nested dictionary by adding new data
+    :param exp_dict: the dict (duh)
+    :return: None
+    """
     blah = 'a'
     done = False
     while not done:
@@ -102,6 +113,11 @@ def fill_dict(exp_dict):
 
 
 def lookup(exp_dict):
+    """
+    Looks up an experiment in the dict and prints the results
+    :param exp_dict:
+    :return:
+    """
     done = False
     while not done:
         model_type = get_input(models, 'model type')
@@ -124,6 +140,11 @@ def lookup(exp_dict):
 
 
 def viewall(exp_dict):
+    """
+    Prints a *beautiful* table of all of the entered data
+    :param exp_dict:
+    :return:
+    """
     '''
     # >>> from beautifultable import BeautifulTable
     # >>> table = BeautifulTable()
@@ -170,6 +191,12 @@ def viewall(exp_dict):
 
 def delete(exp_dict, backup_dict):
     """
+    Deletes a dictionary entry
+    :param exp_dict:
+    :param backup_dict:
+    :return:
+    """
+    """
     implement a delete function
     :param exp_dict:
     :return:
@@ -205,6 +232,12 @@ def delete(exp_dict, backup_dict):
         done = True if done == 'y' else False
 
 def show_remaining_exps(exp_dict):
+    """
+    Basically just print out a table of all of the combinations of parameters not currently in the dictionary;
+    useful for brainstorming what to do next when you're utterly, utterly lost about how to proceed
+    :param exp_dict:
+    :return:
+    """
     '''
         # >>> from beautifultable import BeautifulTable
         # >>> table = BeautifulTable()

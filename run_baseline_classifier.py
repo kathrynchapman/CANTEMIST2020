@@ -273,7 +273,10 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 loss_fct = CrossEntropyLoss()
 
             if self.loss_fct != 'none':
-                loss = loss_fct(logits.view(-1, self.num_labels), ranks.float().view(-1, self.num_labels))
+                if self.args.do_experimental_ranks_instead_of_labels:
+                    loss = loss_fct(logits.view(-1, self.num_labels), ranks.float().view(-1, self.num_labels))
+                else:
+                    loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1,self.num_labels))
             else:
                 loss = 0
 
@@ -915,7 +918,10 @@ def main():
     parser.add_argument('--do_normal_class_weights', action='store_true', help="Whether to use normally "
                                                                                   "calculated class weights")
     parser.add_argument('--do_ranking_loss', action='store_true', help="Whether to use the ranking loss component.")
-    parser.add_argument('--do_weighted_ranking_loss', action='store_true', help="Whether to use the weighted ranking loss component.")
+    parser.add_argument('--do_weighted_ranking_loss', action='store_true', help="Whether to use the weighted ranking "
+                                                                                "loss component.")
+    parser.add_argument('--do_experimental_ranks_instead_of_labels', action='store_true', help='Whether to send ranks '
+                                                                                               'instead of binary labels to loss function')
     parser.add_argument('--doc_batching', action='store_true', help="Whether to fit one document into a batch during")
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
