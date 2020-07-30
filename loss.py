@@ -92,17 +92,18 @@ class RankingLoss(nn.Module):
 
 class BalancedBCEWithLogitsLoss(nn.Module):
     
-    def __init__(self, grad_clip=False):
+    def __init__(self, grad_clip=False, weights=None):
         super(BalancedBCEWithLogitsLoss, self).__init__()
         self.grad_clip = grad_clip
+        self.weights = weights
     
-    def forward(self, logits, labels, weights=None):
+    def forward(self, logits, labels):
         # logits: shape(batch_size, num_classes), dtype=float
         # labels: shape(batch_size, num_classes), dtype=float
         # labels must be a binary valued tensor
         assert logits.shape == labels.shape, "logits shape %r != labels shape %r" % (logits.shape, labels.shape)
 
-        if weights is not None:
+        if self.weights is not None:
             # then we have class weights to make use of
             s_logits = torch.nn.Sigmoid()(logits)
             log_s_logits = torch.log(s_logits)
