@@ -277,8 +277,9 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
 
             if self.args.do_ranking_loss or self.args.do_weighted_ranking_loss:
                 if not self.args.do_weighted_ranking_loss:
-                    class_weights = None
-                loss_fct = RankingLoss(self.args.doc_batching, weights=class_weights)
+                    loss_fct = RankingLoss(self.args.doc_batching, weights=None)
+                else:
+                    loss_fct = RankingLoss(self.args.doc_batching, weights=class_weights)
                 loss += loss_fct(logits, ranks)
             outputs = (loss,) + outputs
 
