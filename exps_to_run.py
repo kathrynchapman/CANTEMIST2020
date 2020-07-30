@@ -37,6 +37,7 @@ def get_input(ref_type, str_type):
     return inp_type
 
 def fill_dict(exp_dict):
+    blah = 'a'
     done = False
     while not done:
         ref_type = [models, num_epohcs, doc_batching, ranking_loss, class_weights, loss_function]
@@ -45,37 +46,33 @@ def fill_dict(exp_dict):
         for r_type, s_type in zip(ref_type, str_type):
             inp = get_input(r_type, s_type)
             if inp == 'exit':
-                done = True
+                blah = True
                 break
             else:
                 inputs.append(inp)
-        if done == True:
+        if blah == True:
             break
-
-
-        # model_type = get_input(models, 'model type')
-        # n_eps = get_input(num_epohcs, 'number epochs')
-        # doc_batches = get_input(doc_batching, 'doc batching')
-        # rank_loss = get_input(ranking_loss, 'ranking loss')
-        # cls_wts = get_input(class_weights, 'class weights')
-        # loss_fct = get_input(loss_function, 'loss function')
 
         if exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['MAP']:
             valid = False
-        while not valid:
-            cont = input(
-                "You already have an entry for this - do you want to continue and overwrite? [y, n, just notes]: ")
-            if cont not in ['y', 'n', 'just notes'.strip()]:
-                print("Sorry, didn't get that...")
-            else:
-                valid = True
-        if cont == 'n':
-            continue
-        elif cont == 'just notes':
-            notes = input("Just type the notes here: ")
-            exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes
-            save(exp_dict, 'exp_dict.p')
-            continue
+            while not valid:
+                cont = input(
+                    "You already have an entry for this - do you want to continue and overwrite? [y, n, just notes]: ")
+                if cont not in ['y', 'n', 'just notes'.strip(), 1, 2, 3]:
+                    print("Sorry, didn't get that...")
+                else:
+                    valid = True
+            if cont == 'n' or cont == '2':
+                continue
+            elif cont == 'just notes' or cont == '3':
+                notes = input("Just type the notes here: ")
+                if notes == 'exit':
+                    break
+                exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes
+                save(exp_dict, 'exp_dict.p')
+                continue
+            # if blah == True:
+            #     break
 
 
         MAP = input("Enter MAP: ")
@@ -184,13 +181,13 @@ if __name__=='__main__':
             viewall(exp_dict)
         elif to_do not in ['1', '2', '3']:
             finished = True
-
-    print("######################################## Experiments to Run ########################################")
-    for m in models:
-        for n_ep in num_epohcs:
-            for db in doc_batching:
-                for rl in ranking_loss:
-                    for cw in class_weights:
-                        for lf in loss_function:
-                            if not exp_dict[m][n_ep][db][rl][cw][lf]['MAP']:
-                                print(m + '\t' + n_ep + '\t' + db + '\t' + rl + '\t' + cw + '\t' + lf)
+    #
+    # print("######################################## Experiments to Run ########################################")
+    # for m in models:
+    #     for n_ep in num_epohcs:
+    #         for db in doc_batching:
+    #             for rl in ranking_loss:
+    #                 for cw in class_weights:
+    #                     for lf in loss_function:
+    #                         if not exp_dict[m][n_ep][db][rl][cw][lf]['MAP']:
+    #                             print(m + '\t' + n_ep + '\t' + db + '\t' + rl + '\t' + cw + '\t' + lf)
