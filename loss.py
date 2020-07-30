@@ -4,9 +4,10 @@ import torch
 import torch.nn as nn
 
 class RankingLoss(nn.Module):
-    def __init__(self, doc_batching=False):
+    def __init__(self, doc_batching=False, weights=None):
         super(RankingLoss, self).__init__()
         self.doc_batching = doc_batching
+        self.weights = weights
 
     def forward(self, logits, ranks):
         if self.doc_batching:
@@ -14,6 +15,8 @@ class RankingLoss(nn.Module):
             # 1 - apply sigmoid to logits to get probabilities
             temp = torch.nn.Sigmoid()(logits).cpu()
             ranks = ranks.cpu()
+            if self.weights is not None:
+                ranks *= self.weights
 
             n_labels = torch.max(ranks).item()
             if n_labels != 0:
@@ -153,5 +156,6 @@ class BalancedBCEWithLogitsLoss(nn.Module):
             loss = (loss + weighted_loss)/2
         elif weighted_loss and self.reduction == 'sum':
             loss += weighted_loss
+
         
         return loss

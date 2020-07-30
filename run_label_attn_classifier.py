@@ -103,9 +103,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         self.args = args
         self.w1 = torch.nn.Linear(args.doc_max_seq_length, 1)
         self.w2 = torch.nn.Linear(args.label_max_seq_length, 1)
-        # if self.args.logit_aggregation == 'layer':
-        #     self.logit_agg = torch.nn.Linear()
-        # self.classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
+
         self.hidden_size = config.hidden_size
         self.init_weights()
 
@@ -234,19 +232,25 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
             else:
                 class_weights = None
 
+            labels = labels.float()
+
             if self.loss_fct == 'bce':
                 loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
             elif self.loss_fct == 'bbce':
                 loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True, weights=class_weights)
             elif self.loss_fct == 'cel':
                 loss_fct = CrossEntropyLoss()
-            labels = labels.float()
 
-            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
+            if self.loss_fct != 'none':
+                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
+            else:
+                loss = 0
 
 
-            if self.args.do_ranking_loss:
-                loss_fct = RankingLoss(self.args.doc_batching)
+            if self.args.do_ranking_loss or self.args.do_weighted_ranking_loss:
+                if not self.args.do_weighted_ranking_loss:
+                    class_weights = None
+                loss_fct = RankingLoss(self.args.doc_batching, weights=class_weights)
                 loss += loss_fct(logits, ranks)
             outputs = (loss,) + outputs
 
@@ -863,7 +867,7 @@ def main():
         help="Threshold at which to decide between 0 and 1 for labels.",
     )
     parser.add_argument(
-        "--loss_fct", default="bce", type=str, help="The function to use.",
+        "--loss_fct", default="none", type=str, help="The function to use.",
     )
     parser.add_argument(
         "--config_name", default="", type=str, help="Pretrained config name or path if not the same as model_name",
@@ -929,6 +933,8 @@ def main():
     parser.add_argument('--do_normal_class_weights', action='store_true', help="Whether to use normally "
                                                                                   "calculated class weights")
     parser.add_argument('--do_ranking_loss', action='store_true', help="Whether to use the ranking loss component.")
+    parser.add_argument('--do_weighted_ranking_loss', action='store_true',
+                        help="Whether to use the weighted ranking loss component.")
     parser.add_argument('--doc_batching', action='store_true', help="Whether to fit one document into a batch during")
 
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")

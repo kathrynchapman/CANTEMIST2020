@@ -261,6 +261,7 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 class_weights = torch.Tensor(self.class_weights).cuda()
             else:
                 class_weights = None
+            labels = labels.float()
 
             if self.loss_fct == 'bce':
                 loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
@@ -268,13 +269,21 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True, weights=class_weights)
             elif self.loss_fct == 'cel':
                 loss_fct = CrossEntropyLoss()
-            labels = labels.float()
-            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
 
-            if self.args.do_ranking_loss:
-                loss_fct = RankingLoss(self.args.doc_batching)
+            if self.loss_fct != 'none':
+                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
+            else:
+                loss = 0
+
+            if self.args.do_ranking_loss or self.args.do_weighted_ranking_loss:
+                if not self.args.do_weighted_ranking_loss:
+                    class_weights = None
+                loss_fct = RankingLoss(self.args.doc_batching, weights=class_weights)
                 loss += loss_fct(logits, ranks)
             outputs = (loss,) + outputs
+
+
+
             # loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
             # outputs = (loss,) + outputs
         self.iteration += 1
@@ -903,6 +912,7 @@ def main():
     parser.add_argument('--do_normal_class_weights', action='store_true', help="Whether to use normally "
                                                                                   "calculated class weights")
     parser.add_argument('--do_ranking_loss', action='store_true', help="Whether to use the ranking loss component.")
+    parser.add_argument('--do_weighted_ranking_loss', action='store_true', help="Whether to use the weighted ranking loss component.")
     parser.add_argument('--doc_batching', action='store_true', help="Whether to fit one document into a batch during")
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
