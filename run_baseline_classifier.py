@@ -954,6 +954,7 @@ def main():
     args = parser.parse_args()
     if args.doc_batching:
         args.per_gpu_train_batch_size = 10
+        args.per_gpu_eval_batch_size = 10
 
     if (
             os.path.exists(args.output_dir)
