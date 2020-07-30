@@ -96,13 +96,15 @@ class BalancedBCEWithLogitsLoss(nn.Module):
         super(BalancedBCEWithLogitsLoss, self).__init__()
         self.grad_clip = grad_clip
     
-    def forward(self, logits, labels):
+    def forward(self, logits, labels, weights=None):
         # logits: shape(batch_size, num_classes), dtype=float
         # labels: shape(batch_size, num_classes), dtype=float
         # labels must be a binary valued tensor
         assert logits.shape == labels.shape, "logits shape %r != labels shape %r" % (logits.shape, labels.shape)
         # number of classes
         nc = labels.shape[1]
+        print(labels.shape)
+        print(nc)
         # number of positive classes per example in batch
         npos_per_example = labels.sum(1)                # shape: [batch_size]
         

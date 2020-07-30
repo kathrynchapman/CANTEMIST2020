@@ -3,6 +3,7 @@ from torch import save, load
 from functools import partial
 import pandas as pd
 from beautifultable import BeautifulTable
+from datetime import datetime
 
 models = ['baseline', 'label_attention']
 
@@ -40,6 +41,8 @@ def fill_dict(exp_dict):
     blah = 'a'
     done = False
     while not done:
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
         ref_type = [models, num_epohcs, doc_batching, ranking_loss, class_weights, loss_function]
         str_type = ['model type', 'number epochs', 'doc batching', 'ranking loss', 'class weights', 'loss function']
         inputs = []
@@ -68,7 +71,8 @@ def fill_dict(exp_dict):
                 notes = input("Just type the notes here: ")
                 if notes == 'exit':
                     break
-                exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes
+                exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes + \
+                                                                            " (last edited {})".format(dt_string)
                 save(exp_dict, 'exp_dict.p')
                 continue
             # if blah == True:
@@ -85,6 +89,9 @@ def fill_dict(exp_dict):
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['F1'] = float(F1)
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['P'] = float(P)
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['R'] = float(R)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Entry Date'] = dt_string
+
+
         if notes:
             exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes
 
@@ -109,6 +116,8 @@ def lookup(exp_dict):
         print("F1:", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['F1'])
         print("P:", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['P'])
         print("R:", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['R'])
+        print("Notes: ", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['Notes'])
+        print("Entry Date: ", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['Entry Date'])
         done = True if input("Do you have another experiment to look up? [y, n]: ") == 'n' else False
         if not done:
             print('-' * 100)
@@ -130,8 +139,8 @@ def viewall(exp_dict):
     '''
     table = BeautifulTable(maxwidth=150)
     table.columns.header = ["Model", "#Epochs", "Doc Batching", "Ranking Loss", "Class Weights", "Loss Funct", "MAP",
-                            "F1", "P", "R", "Notes"]
-    table.column_widths = [10, 9, 15, 15, 15, 15, 7, 7, 7, 7, 20]
+                            "F1", "P", "R", "Notes", "Entry Date"]
+    table.column_widths = [10, 9, 15, 15, 15, 15, 7, 7, 7, 7, 20, 15]
     for m in exp_dict.keys():
         for n_ep in exp_dict[m].keys():
             for db in exp_dict[m][n_ep].keys():
@@ -143,11 +152,13 @@ def viewall(exp_dict):
                             p = exp_dict[m][n_ep][db][rl][cw][lf]['P']
                             r = exp_dict[m][n_ep][db][rl][cw][lf]['R']
                             notes = exp_dict[m][n_ep][db][rl][cw][lf]['Notes']
+                            ed = exp_dict[m][n_ep][db][rl][cw][lf]['Entry Date']
                             m_ = ' label  attn ' if m == 'label_attention' else m
                             rl_ = 'Y' if rl == 'ranking_loss' else 'N'
                             d = 'N' if db == 'no_doc_batching' else db[-3:]
                             c = 'N' if cw == 'no_class_weights' else cw
-                            table.rows.append([m_, n_ep, d, rl_, c, lf, map, f1, p, r, notes])
+                            ed = 'N/A' if ed == 0.0 else ed
+                            table.rows.append([m_, n_ep, d, rl_, c, lf, map, f1, p, r, notes, ed])
     print(table)
                             # print("Results for {}, {}, {}, {}, {}, {}".format(m, n_ep, db, rl, cw, lf))
                             # print("MAP:", exp_dict[m][n_ep][db][rl][cw][lf]['MAP'])
@@ -156,6 +167,17 @@ def viewall(exp_dict):
                             # print("R:", exp_dict[m][n_ep][db][rl][cw][lf]['R'])
 
 
+def delete(exp_dict):
+    """
+    implement a delete function
+    :param exp_dict:
+    :return:
+    """
+    # viewall(exp_dict)
+    # exp_dict['label_attention']['45']['doc_batching_max']['ranking_loss'].pop('class_weights')
+    # viewall(exp_dict)
+    # save(exp_dict, 'exp_dict.p')
+    pass
 
 
 if __name__=='__main__':
@@ -181,7 +203,7 @@ if __name__=='__main__':
             viewall(exp_dict)
         elif to_do not in ['1', '2', '3']:
             finished = True
-    #
+
     # print("######################################## Experiments to Run ########################################")
     # for m in models:
     #     for n_ep in num_epohcs:
