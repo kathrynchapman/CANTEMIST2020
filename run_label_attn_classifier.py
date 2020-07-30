@@ -235,7 +235,6 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
                 class_weights = None
 
             if self.loss_fct == 'bce':
-                print(class_weights)
                 loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
             elif self.loss_fct == 'bbce':
                 loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True)
