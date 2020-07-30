@@ -978,6 +978,8 @@ def main():
     parser.add_argument("--server_ip", type=str, default="", help="For distant debugging.")
     parser.add_argument("--server_port", type=str, default="", help="For distant debugging.")
     args = parser.parse_args()
+    if args.doc_batching:
+        args.per_gpu_train_batch_size = 10
 
     if (
             os.path.exists(args.output_dir)
