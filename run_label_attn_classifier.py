@@ -223,8 +223,6 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
                 temp = (temp > self.args.prediction_threshold).float()
                 temp = torch.mean(
                     torch.abs(temp.view(-1, self.num_labels) - labels.view(-1, self.num_labels)).float() + 1, axis=0)
-
-
                 self.class_weights = self.class_weights.cuda()
 
                 self.class_weights *= self.iteration
@@ -237,6 +235,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
                 class_weights = None
 
             if self.loss_fct == 'bce':
+                print(class_weights)
                 loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
             elif self.loss_fct == 'bbce':
                 loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True)
