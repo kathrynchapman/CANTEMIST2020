@@ -92,10 +92,11 @@ class RankingLoss(nn.Module):
 
 class BalancedBCEWithLogitsLoss(nn.Module):
     
-    def __init__(self, grad_clip=False, weights=None):
+    def __init__(self, grad_clip=False, weights=None, reduction='mean'):
         super(BalancedBCEWithLogitsLoss, self).__init__()
         self.grad_clip = grad_clip
         self.weights = weights
+        self.reduction = reduction
     
     def forward(self, logits, labels):
         # logits: shape(batch_size, num_classes), dtype=float
@@ -114,9 +115,13 @@ class BalancedBCEWithLogitsLoss(nn.Module):
             log_one_minus_s_logits = torch.log(1-s_logits)
 
             # weighted_loss = torch.matmul(weighted_targets, log_s_logits) + torch.matmul(one_minus_targets, log_one_minus_s_logits)
-            weighted_loss = (weighted_targets * log_s_logits) + (one_minus_targets * log_one_minus_s_logits)
+            weighted_loss = -((weighted_targets * log_s_logits) + (one_minus_targets * log_one_minus_s_logits))
+
             assert weighted_loss.shape == logits.shape
-            print(weighted_loss)
+            weighted_loss = weighted_loss.mean()
+
+        else:
+            weighted_loss = False
 
 
 
@@ -144,5 +149,9 @@ class BalancedBCEWithLogitsLoss(nn.Module):
         loss = -(torch.log(proba) * pos_weight + torch.log(1. - proba) * (1. - labels))
         # the labels which are supposed to be positive get more weight added to them
         loss = loss.mean()
+        if weighted_loss and self.reduction == 'mean':
+            loss = (loss + weighted_loss)/2
+        elif weighted_loss and self.reduction == 'sum':
+            loss += weighted_loss
         
         return loss

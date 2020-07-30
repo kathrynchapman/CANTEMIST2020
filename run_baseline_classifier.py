@@ -265,7 +265,7 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
             if self.loss_fct == 'bce':
                 loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
             elif self.loss_fct == 'bbce':
-                loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True)
+                loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True, weights=class_weights)
             elif self.loss_fct == 'cel':
                 loss_fct = CrossEntropyLoss()
             labels = labels.float()

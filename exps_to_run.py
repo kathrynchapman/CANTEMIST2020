@@ -56,6 +56,12 @@ def fill_dict(exp_dict):
         if blah == True:
             break
 
+        if inputs[4] != 'no_class_weights' and inputs[5] == 'bbce':
+            reduct = input("How did you combine bbce and class weights loss? [mean, sum]: ")
+            reduct = 'mean' if reduct == 1 else reduct
+            reduct = 'sum' if reduct == 2 else reduct
+            inputs[5] += ' - ' + reduct
+
         if exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['MAP']:
             valid = False
             while not valid:
@@ -75,9 +81,6 @@ def fill_dict(exp_dict):
                                                                             " (last edited {})".format(dt_string)
                 save(exp_dict, 'exp_dict.p')
                 continue
-            # if blah == True:
-            #     break
-
 
         MAP = input("Enter MAP: ")
         F1 = input("Enter F1: ")
