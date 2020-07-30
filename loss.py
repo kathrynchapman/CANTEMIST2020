@@ -101,10 +101,28 @@ class BalancedBCEWithLogitsLoss(nn.Module):
         # labels: shape(batch_size, num_classes), dtype=float
         # labels must be a binary valued tensor
         assert logits.shape == labels.shape, "logits shape %r != labels shape %r" % (logits.shape, labels.shape)
+
+        if weights is not None:
+            # then we have class weights to make use of
+            s_logits = torch.nn.Sigmoid()(logits)
+            log_s_logits = torch.log(s_logits)
+            weighted_targets = weights * labels
+
+
+            one_minus_targets = 1 - labels
+            log_one_minus_s_logits = torch.log(1-s_logits)
+
+            weighted_loss = torch.matmul(weighted_targets, log_s_logits) + torch.matmul(one_minus_targets, log_one_minus_s_logits)
+
+            assert weighted_loss.size == logits.shape[0]
+            print(weighted_loss)
+
+
+
+
         # number of classes
         nc = labels.shape[1]
-        print(labels.shape)
-        print(nc)
+
         # number of positive classes per example in batch
         npos_per_example = labels.sum(1)                # shape: [batch_size]
         
