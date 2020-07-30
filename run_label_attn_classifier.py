@@ -1075,7 +1075,8 @@ def main():
         from_tf=bool(".ckpt" in args.model_name_or_path),
         config=config,
         loss_fct=args.loss_fct,
-        args=args
+        args=args,
+        class_weights=class_weights,
     )
 
     # model = model_class()

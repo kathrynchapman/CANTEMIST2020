@@ -1057,7 +1057,8 @@ def main():
         from_tf=bool(".ckpt" in args.model_name_or_path),
         config=config,
         loss_fct=args.loss_fct,
-        args=args
+        args=args,
+        class_weights=class_weights,
     )
     # for name, param in model.named_parameters():
     #     if param.requires_grad:
