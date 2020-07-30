@@ -68,6 +68,7 @@ class RankingLoss(nn.Module):
 
             # 3 - check if lowest-ranking true positive probability is higher than all negative class probs
             lowest_ranking_probs = torch.Tensor([t[-1] for t in true_label_probs])  # - when not using doc batching
+            print(remaining_probs)
             highest_remaining_probs = torch.Tensor(
                 [torch.max(t) for t in remaining_probs])  # - when not using doc batching
 
