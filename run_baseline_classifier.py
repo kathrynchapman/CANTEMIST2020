@@ -652,7 +652,8 @@ def evaluate(args, model, tokenizer, prefix=""):
     # # preds = np.array(sorted_preds_idx[:n_labels])
 
     n_labels = np.sum(preds, axis=1)
-    print(n_labels)
+    avg_pred_n_labels = np.mean(n_labels)
+    avg_true_n_labels = np.mean(np.sum(labels, axis=1))
     preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
 
     if not args.doc_batching:
@@ -700,6 +701,10 @@ def evaluate(args, model, tokenizer, prefix=""):
         print("*** Eval results with challenge script: *** ")
         print(eval_results)
         writer.write(eval_results)
+        temp = "Average #labels/doc preds: " + avg_pred_n_labels + "\nAverage #labels/doc true: " + avg_true_n_labels
+        writer.write(temp)
+        print(temp)
+
 
     return results
 
