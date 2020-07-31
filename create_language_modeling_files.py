@@ -1,7 +1,7 @@
 import argparse
 import os
 import pickle
-from nltk.tokenize import sent_tokenize
+# from nltk.tokenize import sent_tokenize
 from transformers import XLMRobertaTokenizer
 
 
