@@ -631,6 +631,8 @@ def main():
     args = parser.parse_args()
 
     if not args.train_data_file:
+        args.train_data_file ='LM_{}_{}_{}.txt'.format(args.model_name_or_path, str(args.msl), str(args.stride))
+    if not os.path.exists(args.train_data_file):
         reader = LanguageModelingDataReader(args)
         reader.construct_data_dict(train=True)
         reader.construct_data_dict()
