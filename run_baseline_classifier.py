@@ -652,7 +652,7 @@ def evaluate(args, model, tokenizer, prefix=""):
     # # preds = np.array(sorted_preds_idx[:n_labels])
 
     print(preds.shape)
-    print(labels.shape)
+    print(labels)
 
     n_labels = np.sum(preds, axis=1)
     avg_pred_n_labels = np.mean(n_labels)
