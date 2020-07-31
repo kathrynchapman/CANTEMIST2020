@@ -46,23 +46,26 @@ class LanguageModelingDataReader():
         for f_name in all_file_names:
             with open(path + f_name) as f:
                 text = f.read().replace('\n', ' ').replace('\t', ' ')
-                sentences = sent_tokenize(text)
+                # sentences = sent_tokenize(text)
+                # sentences_tok = [self.tokenizer.tokenize(s) for s in sentences]
 
 
                 tokens = self.tokenizer.tokenize(text)
                 while tokens:
-                    self.data_list.append(self.tokenizer.convert_tokens_to_string(tokens[:512]))
-                    tokens = tokens[512:]
+                    self.data_list.append(self.tokenizer.convert_tokens_to_string(tokens[:self.args.msl]))
+                    tokens = tokens[:self.args.msl-self.args.stride]
+        self.data_list = [self.tokenizer.convert_tokens_to_string(t) for t in self.data_list]
+        print(self.data_list)
                 # text = sent_tokenize(text)
                 # tokenized_sents = [self.tokenizer.tokenize(t) for t in text]
                 #
                 # if text:
                 #     self.data_list += text
-        # print(counter)
-        for d in self.data_list:
-            print(d)
-        # print(self.data_list)
-        print(len(self.data_list))
+        # # print(counter)
+        # for d in self.data_list:
+        #     print(d)
+        # # print(self.data_list)
+        # print(len(self.data_list))
 
 
 if __name__=='__main__':
@@ -70,6 +73,8 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--preprocess', action='store_true', help="Whether to redo all of the pre-processing.")
     parser.add_argument('--model_name', type=str, help="What type of BERT flavor we're working with")
+    parser.add_argument('--msl', type=int, default=512, help="Intended max seq len")
+    parser.add_argument('--stride', type=int, default=75, help="Overlap between documents")
 
     args = parser.parse_args()
 

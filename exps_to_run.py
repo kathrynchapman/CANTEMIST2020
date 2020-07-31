@@ -6,6 +6,7 @@ from beautifultable import BeautifulTable
 from datetime import datetime
 
 models = ['baseline', 'label_attention']
+bert_flavors = ['ml_bert', 'xlmr']
 num_epohcs = ['any int']
 doc_batching = ['no_doc_batching', 'doc_batching_max']
 ranking_loss = ['no_ranking_loss', 'ranking_loss', 'weighted_ranking_loss']
@@ -49,8 +50,8 @@ def fill_dict(exp_dict):
         add_to_notes = ''
         now = datetime.now()
         dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-        ref_type = [models, num_epohcs, doc_batching, ranking_loss, class_weights, loss_function]
-        str_type = ['model type', 'number epochs', 'doc batching', 'ranking loss', 'class weights', 'loss function']
+        ref_type = [models, bert_flavors, num_epohcs, doc_batching, ranking_loss, class_weights, loss_function]
+        str_type = ['model type', 'bert type', 'number epochs', 'doc batching', 'ranking loss', 'class weights', 'loss function']
         inputs = []
         for r_type, s_type in zip(ref_type, str_type):
             inp = get_input(r_type, s_type)
@@ -68,7 +69,7 @@ def fill_dict(exp_dict):
             reduct = 'sum' if reduct == 2 else reduct
             inputs[5] += ' - ' + reduct
 
-        if exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['MAP']:
+        if exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['MAP']:
             valid = False
             while not valid:
                 cont = input(
@@ -85,7 +86,7 @@ def fill_dict(exp_dict):
                 notes = input("Just type the notes here: ")
                 if notes == 'exit':
                     break
-                exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes + \
+                exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['Notes'] = notes + \
                                                                                                       " (last edited {})".format(
                                                                                                           dt_string)
                 save(exp_dict, 'exp_dict.p')
@@ -98,12 +99,12 @@ def fill_dict(exp_dict):
         avg_nlabels = input("Enter avg #label/doc: ")
         notes = input("Any notes on this? (Just type them if so): ")
 
-        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['MAP'] = float(MAP)
-        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['F1'] = float(F1)
-        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['P'] = float(P)
-        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['R'] = float(R)
-        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Avg #Labels'] = float(avg_nlabels)
-        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Entry Date'] = dt_string
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['MAP'] = float(MAP)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['F1'] = float(F1)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['P'] = float(P)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['R'] = float(R)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['Avg #Labels'] = float(avg_nlabels)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['Entry Date'] = dt_string
 
         if notes or add_to_notes:
             exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes + add_to_notes
@@ -123,19 +124,20 @@ def lookup(exp_dict):
     done = False
     while not done:
         model_type = get_input(models, 'model type')
+        bert_type = get_input(bert_flavors, 'bert type')
         n_eps = get_input(num_epohcs, 'number epochs')
         doc_batches = get_input(doc_batching, 'doc batching')
         rank_loss = get_input(ranking_loss, 'ranking loss')
         cls_wts = get_input(class_weights, 'class weights')
         loss_fct = get_input(loss_function, 'loss function')
 
-        print("Results for {}, {}, {}, {}, {}, {}".format(model_type, n_eps, doc_batches, rank_loss, cls_wts, loss_fct))
-        print("MAP:", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['MAP'])
-        print("F1:", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['F1'])
-        print("P:", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['P'])
-        print("R:", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['R'])
-        print("Notes: ", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['Notes'])
-        print("Entry Date: ", exp_dict[model_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['Entry Date'])
+        print("Results for {}, {}, {}, {}, {}, {}".format(model_type, bert_type, n_eps, doc_batches, rank_loss, cls_wts, loss_fct))
+        print("MAP:", exp_dict[model_type][bert_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['MAP'])
+        print("F1:", exp_dict[model_type][bert_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['F1'])
+        print("P:", exp_dict[model_type][bert_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['P'])
+        print("R:", exp_dict[model_type][bert_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['R'])
+        print("Notes: ", exp_dict[model_type][bert_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['Notes'])
+        print("Entry Date: ", exp_dict[model_type][bert_type][n_eps][doc_batches][rank_loss][cls_wts][loss_fct]['Entry Date'])
         done = True if input("Do you have another experiment to look up? [y, n]: ") == 'n' else False
         if not done:
             print('-' * 100)
@@ -162,38 +164,33 @@ def viewall(exp_dict):
     :return:
     '''
     table = BeautifulTable(maxwidth=300)
-    table.columns.header = ["Model", "#Epochs", "Doc Batching", "Ranking Loss", "Class Weights", "Loss Funct", "MAP",
+    table.columns.header = ["Model", "BERT", "#Epochs", "Doc Batching", "Ranking Loss", "Class Weights", "Loss Funct", "MAP",
                             "F1", "P", "R", "Avg #Labels", "Notes", "Entry Date"]
-    table.column_widths = [15, 9, 15, 15, 23, 15, 7, 7, 7, 7, 7, 20, 15]
+    table.column_widths = [15, 9, 9, 15, 15, 23, 15, 7, 7, 7, 7, 7, 21, 15]
     for m in exp_dict.keys():
-        for n_ep in exp_dict[m].keys():
-            for db in exp_dict[m][n_ep].keys():
-                for rl in exp_dict[m][n_ep][db].keys():
-                    for cw in exp_dict[m][n_ep][db][rl].keys():
-                        for lf in exp_dict[m][n_ep][db][rl][cw].keys():
-                            map = exp_dict[m][n_ep][db][rl][cw][lf]['MAP']
-                            f1 = exp_dict[m][n_ep][db][rl][cw][lf]['F1']
-                            p = exp_dict[m][n_ep][db][rl][cw][lf]['P']
-                            r = exp_dict[m][n_ep][db][rl][cw][lf]['R']
-                            notes = exp_dict[m][n_ep][db][rl][cw][lf]['Notes']
-                            avg_nlabels = exp_dict[m][n_ep][db][rl][cw][lf]['Avg #Labels']
-                            ed = exp_dict[m][n_ep][db][rl][cw][lf]['Entry Date']
+        for b_t in exp_dict[m].keys():
+            for n_ep in exp_dict[m][b_t].keys():
+                for db in exp_dict[m][b_t][n_ep].keys():
+                    for rl in exp_dict[m][b_t][n_ep][db].keys():
+                        for cw in exp_dict[m][b_t][n_ep][db][rl].keys():
+                            for lf in exp_dict[m][b_t][n_ep][db][rl][cw].keys():
+                                map = exp_dict[m][b_t][n_ep][db][rl][cw][lf]['MAP']
+                                f1 = exp_dict[m][b_t][n_ep][db][rl][cw][lf]['F1']
+                                p = exp_dict[m][b_t][n_ep][db][rl][cw][lf]['P']
+                                r = exp_dict[m][b_t][n_ep][db][rl][cw][lf]['R']
+                                notes = exp_dict[m][b_t][n_ep][db][rl][cw][lf]['Notes']
+                                avg_nlabels = exp_dict[m][b_t][n_ep][db][rl][cw][lf]['Avg #Labels']
+                                ed = exp_dict[m][b_t][n_ep][db][rl][cw][lf]['Entry Date']
 
-                            m_ = 'label attn' if m == 'label_attention' else m
-                            rl_ = 'Y' if rl == 'ranking_loss' else 'N'
-                            db_ = 'N' if db == 'no_doc_batching' else db[-3:]
-                            cw_ = 'N' if cw == 'no_class_weights' else cw
-                            ed = 'N/A' if ed == 0.0 else ed
-                            avg_nlabels = 'N/A' if avg_nlabels == 0.0 else avg_nlabels
+                                m_ = 'label attn' if m == 'label_attention' else m
+                                rl_ = 'Y' if rl == 'ranking_loss' else 'N'
+                                db_ = 'N' if db == 'no_doc_batching' else db[-3:]
+                                cw_ = 'N' if cw == 'no_class_weights' else cw
+                                ed = 'N/A' if ed == 0.0 else ed
+                                avg_nlabels = 'N/A' if avg_nlabels == 0.0 else avg_nlabels
 
-                            table.rows.append([m_, n_ep, db_, rl_, cw_, lf, map, f1, p, r, avg_nlabels, notes, ed])
+                                table.rows.append([m_, b_t, n_ep, db_, rl_, cw_, lf, map, f1, p, r, avg_nlabels, notes, ed])
     print(table)
-    # print("Results for {}, {}, {}, {}, {}, {}".format(m, n_ep, db, rl, cw, lf))
-    # print("MAP:", exp_dict[m][n_ep][db][rl][cw][lf]['MAP'])
-    # print("F1:", exp_dict[m][n_ep][db][rl][cw][lf]['F1'])
-    # print("P:", exp_dict[m][n_ep][db][rl][cw][lf]['P'])
-    # print("R:", exp_dict[m][n_ep][db][rl][cw][lf]['R'])
-
 
 def delete(exp_dict, backup_dict):
     """
@@ -217,8 +214,8 @@ def delete(exp_dict, backup_dict):
         add_to_notes = ''
         now = datetime.now()
         dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-        ref_type = [models, num_epohcs, doc_batching, ranking_loss, class_weights, loss_function]
-        str_type = ['model type', 'number epochs', 'doc batching', 'ranking loss', 'class weights', 'loss function']
+        ref_type = [models, bert_flavors, num_epohcs, doc_batching, ranking_loss, class_weights, loss_function]
+        str_type = ['model type', 'bert type', 'number epochs', 'doc batching', 'ranking loss', 'class weights', 'loss function']
         inputs = []
         for r_type, s_type in zip(ref_type, str_type):
             inp = get_input(r_type, s_type)
@@ -230,8 +227,8 @@ def delete(exp_dict, backup_dict):
         if blah == True:
             break
 
-        to_delete = exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]].pop(inputs[5])
-        backup_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]] = to_delete
+        to_delete = exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4][inputs[5]]].pop(inputs[6])
+        backup_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]] = to_delete
         save(exp_dict, 'exp_dict.p')
         save(backup_dict, 'backup.p')
         done = input("Do you have another entry to delete? [y, n] ")
@@ -259,20 +256,21 @@ def show_remaining_exps(exp_dict):
         :return:
     '''
     table = BeautifulTable(maxwidth=300)
-    table.columns.header = ["Model", "#Epochs", "Doc Batching", "Ranking Loss", "Class Weights", "Loss Funct"]
-    table.column_widths = [17, 9, 20, 23, 23, 15]
+    table.columns.header = ["Model", 'BERT Type', "#Epochs", "Doc Batching", "Ranking Loss", "Class Weights", "Loss Funct"]
+    table.column_widths = [17, 9, 9, 20, 23, 23, 15]
     print("######################################## Experiments to Run ########################################")
     for m in models:
-        for n_ep in num_epohcs:
-            for db in doc_batching:
-                for rl in ranking_loss:
-                    for cw in class_weights:
-                        for lf in loss_function:
-                            if not exp_dict[m]['45'][db][rl][cw][lf]['MAP']:
-                                if not (lf == 'none' and rl == 'no_ranking_loss'):
-                                    if not (rl == 'weighted_ranking_loss' and cw == 'no_class_weights'):
-                                        if not (rl!= 'weighted_ranking_loss' and lf[-5:] == 'ranks'):
-                                            table.rows.append([m, n_ep, db, rl, cw, lf])
+        for b in bert_flavors:
+            for n_ep in num_epohcs:
+                for db in doc_batching:
+                    for rl in ranking_loss:
+                        for cw in class_weights:
+                            for lf in loss_function:
+                                if not exp_dict[m]['45'][db][rl][cw][lf]['MAP']:
+                                    if not (lf == 'none' and rl == 'no_ranking_loss'):
+                                        if not (rl == 'weighted_ranking_loss' and cw == 'no_class_weights'):
+                                            if not (rl!= 'weighted_ranking_loss' and lf[-5:] == 'ranks'):
+                                                table.rows.append([m, b, n_ep, db, rl, cw, lf])
     print(table)
 
 
@@ -286,7 +284,9 @@ if __name__ == '__main__':
             partial(defaultdict,
             partial(defaultdict,
             partial(defaultdict,
-            partial(defaultdict, float)))))))
+            partial(defaultdict,
+            partial(defaultdict, str))))))))
+
 
     finished = False
     while not finished:
