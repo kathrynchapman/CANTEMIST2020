@@ -271,8 +271,11 @@ def convert_examples_to_features(
 
         except:
             print(example)
-        input_ids, token_type_ids = [inputs["input_ids"] for inputs in batch], [inputs["token_type_ids"] for inputs in
-                                                                                batch]
+        try:
+            input_ids, token_type_ids = [inputs["input_ids"] for inputs in batch], [inputs["token_type_ids"] for inputs in
+                                                                                    batch]
+        except:
+            input_ids, token_type_ids = [inputs["input_ids"] for inputs in batch], None
         # input_ids = [[101, 17160, 10124, 169, 102], [101, 16138, 10454, 11940, 102],
         #               [101, 10142, 11152, 81130, 102], [101, 11127, 106, 102]]
 
@@ -297,7 +300,8 @@ def convert_examples_to_features(
         # attention_masks = [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 0]]
         #                                                                                    ^
 
-        token_type_ids[-1] = token_type_ids[-1] + ([pad_token_segment_id] * padding_length)
+        if token_type_ids is not None:
+            token_type_ids[-1] = token_type_ids[-1] + ([pad_token_segment_id] * padding_length)
         # token_type_ids = [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
         # these ate only useful if we have [CLS] text [SEP] text2 [SEP]
 
@@ -306,9 +310,10 @@ def convert_examples_to_features(
         assert int(np.mean([len(t) for t in attention_masks])) == max_length, "Error with input length {} vs {}".format(
             np.mean([len(t) for t in attention_masks]), max_length
         )
-        assert int(np.mean([len(t) for t in token_type_ids])) == max_length, "Error with input length {} vs {}".format(
-            np.mean([len(t) for t in token_type_ids]), max_length
-        )
+        if token_type_ids is not None:
+            assert int(np.mean([len(t) for t in token_type_ids])) == max_length, "Error with input length {} vs {}".format(
+                np.mean([len(t) for t in token_type_ids]), max_length
+            )
         assert len(input_ids) <= args.per_gpu_train_batch_size, "Error, there are {} batches".format(len(input_ids))
 
 
@@ -338,7 +343,7 @@ def convert_examples_to_features(
                 InputFeatures(
                     input_ids=input_ids[0],
                     input_mask=attention_masks[0],
-                    segment_ids=token_type_ids[0],
+                    segment_ids=token_type_ids[0] if token_type_ids is not None else None,
                     label_ids=label_ids,
                     label_ranks=label_ranks,
                     guid=example.guid,
@@ -352,7 +357,7 @@ def convert_examples_to_features(
                 InputFeatures(
                     input_ids=input_ids,
                     input_mask=attention_masks,
-                    segment_ids=token_type_ids,
+                    segment_ids=token_type_ids if token_type_ids is not None else None,
                     label_ids=label_ids,
                     label_ranks=label_ranks,
                     guid=int(example.guid),
@@ -445,7 +450,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
     if args.doc_batching:
         all_input_ids = [torch.tensor(f.input_ids, dtype=torch.long) for f in doc_features]
         all_attention_mask = [torch.tensor(f.input_mask, dtype=torch.long) for f in doc_features]
-        all_token_type_ids = [torch.tensor(f.segment_ids, dtype=torch.long) for f in doc_features]
+        all_token_type_ids = [torch.tensor(f.segment_ids, dtype=torch.long) for f in doc_features] 
         all_labels = [torch.tensor(f.label_ids, dtype=torch.long) for f in doc_features]
         all_doc_ids = [torch.tensor(f.guid, dtype=torch.long) for f in doc_features]
         all_label_ranks = [torch.tensor(f.label_ranks, dtype=torch.long) for f in doc_features]
