@@ -547,7 +547,8 @@ def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
             raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
         model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level)
 
-    model.initialize_label_data(next(iter(label_dataloader)))
+    if args.label_attention:
+        model.initialize_label_data(next(iter(label_dataloader)))
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
@@ -717,7 +718,8 @@ def evaluate(args, model, tokenizer, prefix=""):
         eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
 
     label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
-    model.initialize_label_data(next(iter(label_dataloader)))
+    if args.label_attention:
+        model.initialize_label_data(next(iter(label_dataloader)))
 
     # Eval!
     logger.info("***** Running evaluation {} *****".format(prefix))
@@ -902,7 +904,8 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
     test_sampler = SequentialSampler(test_dataset) if args.local_rank == -1 else DistributedSampler(test_dataset)
     test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.test_batch_size)
     label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
-    model.initialize_label_data(next(iter(label_dataloader)))
+    if args.label_attention:
+        model.initialize_label_data(next(iter(label_dataloader)))
 
     # Predict!
     logger.info("***** Running test {} *****".format(prefix))
