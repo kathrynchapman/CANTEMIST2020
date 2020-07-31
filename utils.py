@@ -561,8 +561,9 @@ class MyDataParallel(torch.nn.DataParallel):
             return self.module(*inputs[0], **kwargs[0])
         replicas = self.replicate(self.module, self.device_ids[:len(inputs)])
         # print(replicas)
-        print(inputs)
-        print(kwargs)
+        # print(inputs)
+        # print(kwargs)
+        print(self.device_ids[:len(inputs)])
         outputs = self.parallel_apply(replicas, inputs, kwargs)
         return self.gather(outputs, self.output_device)
 
