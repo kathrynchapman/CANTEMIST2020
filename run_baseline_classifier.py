@@ -644,7 +644,7 @@ def evaluate(args, model, tokenizer, prefix=""):
     preds = (preds > args.prediction_threshold)
 
     assert preds.shape == out_label_ids.shape
-    
+
     result = acc_and_f1(preds, out_label_ids)
     results.update(result)
 
@@ -706,7 +706,8 @@ def evaluate(args, model, tokenizer, prefix=""):
         print("*** Eval results with challenge script: *** ")
         print(eval_results)
         writer.write(eval_results)
-        temp = "Average #labels/doc preds: " + avg_pred_n_labels + "\nAverage #labels/doc true: " + avg_true_n_labels
+        temp = "Average #labels/doc preds: " + str(avg_pred_n_labels) +\
+               "\nAverage #labels/doc true: " + str(avg_true_n_labels)
         writer.write(temp)
         print(temp)
 
