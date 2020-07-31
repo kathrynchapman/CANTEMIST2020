@@ -1,7 +1,7 @@
 import pandas as pd
 import sys
 
-sys.path.insert(1, '../CLEF_Datasets_ICD/processed_data/')
+# sys.path.insert(1, '../CLEF_Datasets_ICD/processed_data/')
 from process_data import *
 import torch
 import io
@@ -15,13 +15,16 @@ import random
 import json
 import argparse
 from loss import BalancedBCEWithLogitsLoss, RankingLoss
-
-from torch.utils.data import Dataset, RandomSampler, DataLoader, SequentialSampler
+import random
 from utils import *
+import scipy.stats as ss
+from torch.utils.data import Dataset, RandomSampler, DataLoader, SequentialSampler
+
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss
 
 from transformers.modeling_bert import BertConfig, BertModel, BertPreTrainedModel
 from transformers.modeling_xlm_roberta import XLMRobertaModel
+from transformers.modeling_xlm_roberta import XLMRobertaModel, XLMRobertaConfig
 
 from tqdm import tqdm, trange
 
@@ -52,7 +55,19 @@ class ICDDataloader(Dataset):
         # return self.data.iloc[idx,]
 
 
+def plackett_luce(some_list):
+    for i in range(1, len(some_list)):
+        some_list[i] /= np.sum(some_list[i:])
+    return np.sum(np.log(some_list))
+
+
 def simple_accuracy(preds, labels):
+    # print(preds)
+    # print(labels)
+    # print("Preds type: ", type(preds))
+    # print("Labels type: ", type(labels))
+    # print("Preds shape: ", preds.shape)
+    # print("Labels shape: ", labels.shape)
     return (preds == labels).mean()
 
 
@@ -73,61 +88,6 @@ def acc_and_f1(preds, labels):
         "recall": recall,
     }
 
-
-#
-# class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
-#     """BERT model for classification.
-#     This module is composed of the BERT model with a linear layer on top of
-#     the pooled output.
-#     Params:
-#         `config`: a BertConfig class instance with the configuration to build a new model.
-#         `num_labels`: the number of classes for the classifier. Default = 2.
-#     Inputs:
-#         `input_ids`: a torch.LongTensor of shape [batch_size, sequence_length]
-#             with the word token indices in the vocabulary(see the tokens preprocessing logic in the scripts
-#             `extract_features.py`, `run_classifier.py` and `run_squad.py`)
-#         `token_type_ids`: an optional torch.LongTensor of shape [batch_size, sequence_length] with the token
-#             types indices selected in [0, 1]. Type 0 corresponds to a `sentence A` and type 1 corresponds to
-#             a `sentence B` token (see BERT paper for more details).
-#         `attention_mask`: an optional torch.LongTensor of shape [batch_size, sequence_length] with indices
-#             selected in [0, 1]. It's a mask to be used if the input sequence length is smaller than the max
-#             input sequence length in the current batch. It's the mask that we typically use for attention when
-#             a batch has varying length sentences.
-#         `labels`: labels for the classification output: torch.LongTensor of shape [batch_size, num_labels]
-#             with indices selected in [0, ..., num_labels].
-#     Outputs:
-#         if `labels` is not `None`:
-#             Outputs the CrossEntropy classification loss of the output with the labels.
-#         if `labels` is `None`:
-#             Outputs the classification logits of shape [batch_size, num_labels].
-#     """
-#
-#     def __init__(self, config, num_labels=2, loss_fct=''):
-#         super(BertForMultiLabelSequenceClassification, self).__init__(config)
-#         self.num_labels = num_labels
-#         self.loss_fct = loss_fct
-#         self.model = BertModel(config)
-#         self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
-#         self.classifier = torch.nn.Linear(config.hidden_size, num_labels)
-#         # self.apply(self.init_weights)
-#         self.init_weights()
-#
-#     def forward(self, input_ids, token_type_ids=None, attention_mask=None, labels=None, doc_ids=None):
-#
-#
-#
-#         outputs = self.model(input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
-#         sequence_output, pooled_output = outputs[0], outputs[1]
-#         pooled_output = self.dropout(pooled_output)
-#         logits = self.classifier(pooled_output)
-#
-#         outputs = (logits,) + outputs[2:]
-#         if labels is not None:
-#             loss_fct = BCEWithLogitsLoss()
-#             labels = labels.float()
-#             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
-#             outputs = (loss,) + outputs
-#         return outputs
 
 class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
     def __init__(self, config, args='', loss_fct='', class_weights=None):
@@ -295,10 +255,215 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
         self.iteration += 1
         return outputs  # (loss), logits, (hidden_states), (attentions)
 
+class BertForMLSCWithLabelAttention(BertPreTrainedModel):
+    def __init__(self, config, args='', loss_fct='', class_weights=None):
+        super().__init__(config)
+        self.args = args
+        if self.args.model_type == 'bert':
+            self.bert = BertModel(config)
+        elif self.args.model_type == 'xlmroberta':
+            self.roberta = XLMRobertaModel(config)
+        self.num_labels = args.num_labels
+        self.label_data = ''
+        if not class_weights:
+            self.class_weights = torch.ones((self.num_labels,))
+        else:
+            self.class_weights = class_weights
+        self.iteration = 1
+        self.loss_fct = loss_fct
+        self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
+
+        self.w1 = torch.nn.Linear(args.doc_max_seq_length, 1)
+        self.w2 = torch.nn.Linear(args.label_max_seq_length, 1)
+
+        self.hidden_size = config.hidden_size
+        self.init_weights()
+
+    def initialize_label_data(self, label_data):
+        self.label_data = label_data
+
+    # @add_start_docstrings_to_callable(BERT_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
+    def forward(
+            self,
+            doc_input_ids=None,
+            doc_attention_mask=None,
+            label_desc_input_ids=None,
+            label_desc_attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            labels=None,
+            ranks=None,
+            output_attentions=None,
+    ):
+        r"""
+        labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
+            Labels for computing the sequence classification/regression loss.
+            Indices should be in :obj:`[0, ..., config.num_labels - 1]`.
+            If :obj:`config.num_labels == 1` a regression loss is computed (Mean-Square loss),
+            If :obj:`config.num_labels > 1` a classification loss is computed (Cross-Entropy).
+    Returns:
+        :obj:`tuple(torch.FloatTensor)` comprising various elements depending on the configuration (:class:`~transformers.BertConfig`) and inputs:
+        loss (:obj:`torch.FloatTensor` of shape :obj:`(1,)`, `optional`, returned when :obj:`label` is provided):
+            Classification (or regression if config.num_labels==1) loss.
+        logits (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, config.num_labels)`):
+            Classification (or regression if config.num_labels==1) scores (before SoftMax).
+        hidden_states (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``config.output_hidden_states=True``):
+            Tuple of :obj:`torch.FloatTensor` (one for the output of the embeddings + one for the output of each layer)
+            of shape :obj:`(batch_size, sequence_length, hidden_size)`.
+            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+        attentions (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``output_attentions=True`` is passed or ``config.output_attentions=True``):
+            Tuple of :obj:`torch.FloatTensor` (one for each layer) of shape
+            :obj:`(batch_size, num_heads, sequence_length, sequence_length)`.
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    Examples::
+        from transformers import BertTokenizer, BertForSequenceClassification
+        import torch
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+        input_ids = torch.tensor(tokenizer.encode("Hello, my dog is cute", add_special_tokens=True)).unsqueeze(0)  # Batch size 1
+        labels = torch.tensor([1]).unsqueeze(0)  # Batch size 1
+        outputs = model(input_ids, labels=labels)
+        loss, logits = outputs[:2]
+        """
+
+        # print("doc_input_ids.shape".upper(), doc_input_ids.shape)
+        if self.args.model_type == 'xlmroberta':
+            doc_outputs = self.roberta(
+                doc_input_ids,
+                attention_mask=doc_attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
+
+            label_outputs = self.roberta(
+                self.label_data[0].cuda(),
+                attention_mask=self.label_data[1].cuda(),
+                # token_type_ids=token_type_ids,
+                # position_ids=position_ids,
+                # head_mask=head_mask,
+                # inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
+        elif self.args.model_type == 'bert':
+            doc_outputs = self.bert(
+                doc_input_ids,
+                attention_mask=doc_attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
+
+            label_outputs = self.bert(
+                self.label_data[0].cuda(),
+                attention_mask=self.label_data[1].cuda(),
+                token_type_ids=self.label_data[-1].cuda(),
+                # position_ids=position_ids,
+                # head_mask=head_mask,
+                # inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
+
+        # get the sequence-level document representations
+        doc_seq_output = doc_outputs[0]
+        # print("DOC SEQ OUTPUT SHAPE:", doc_seq_output.shape)
+        batch_size = doc_seq_output.shape[0]
+        # print("BATCH SIZE:", batch_size)
+
+        # get the sequence-level label description representations
+        label_seq_output = label_outputs[0]
+
+        label_seq_output = label_seq_output.reshape(self.num_labels * self.args.label_max_seq_length, self.hidden_size)
+        temp = torch.matmul(doc_seq_output, label_seq_output.T)
+        temp = temp.permute(0, 2, 1)
+
+        temp = self.w1(temp)
+
+        temp = temp.reshape(batch_size, self.num_labels, self.args.label_max_seq_length)
+
+        temp = self.w2(temp)
+
+        logits = temp.view(-1, self.num_labels)
+        if self.args.doc_batching:
+            if self.args.logit_aggregation == 'max':
+                logits = torch.max(logits, axis=0)[0]
+            elif self.args.logit_aggregation == 'avg':
+                logits = torch.mean(logits, axis=0)
+
+                # print("logits.shape:", logits.shape)
+        # pooled_output = self.dropout(pooled_output)
+        # logits = self.classifier(pooled_output)
+
+        outputs = (logits,)  # + outputs[2:]  # add hidden states and attention if they are here
+
+        if labels is not None:
+            # labels = labels[0,:]
+
+            if self.args.do_iterative_class_weights:
+                # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
+                temp = logits.detach()
+                temp = torch.nn.Sigmoid()(temp)
+                temp = (temp > self.args.prediction_threshold).float()
+                temp = torch.mean(
+                    torch.abs(temp.view(-1, self.num_labels) - labels.view(-1, self.num_labels)).float() + 1, axis=0)
+                try:
+                    self.class_weights = torch.Tensor(self.class_weights).cuda()
+                except:
+                    pass
+                self.class_weights *= self.iteration
+                self.class_weights += temp
+                self.class_weights /= (self.iteration + 1)
+                class_weights = self.class_weights.detach()
+            elif self.args.do_normal_class_weights:
+                class_weights = torch.Tensor(self.class_weights).cuda()
+            else:
+                class_weights = None
+
+            labels = labels.float()
+
+            if self.loss_fct == 'bce':
+                loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
+            elif self.loss_fct == 'bbce':
+                loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True, weights=class_weights)
+            elif self.loss_fct == 'cel':
+                loss_fct = CrossEntropyLoss()
+
+            if self.loss_fct != 'none':
+                if self.args.do_experimental_ranks_instead_of_labels:
+                    loss = loss_fct(logits.view(-1, self.num_labels), ranks.float().view(-1, self.num_labels))
+                else:
+                    loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
+            else:
+                loss = 0
+
+            if self.args.do_ranking_loss or self.args.do_weighted_ranking_loss:
+                if not self.args.do_weighted_ranking_loss:
+                    loss_fct = RankingLoss(self.args.doc_batching, weights=None)
+                else:
+                    loss_fct = RankingLoss(self.args.doc_batching, weights=class_weights)
+                loss += loss_fct(logits, ranks)
+            outputs = (loss,) + outputs
+
+            # loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+            # outputs = (loss,) + outputs
+
+        self.iteration += 1
+        return outputs  # (loss), logits, (hidden_states), (attentions)
+
 
 MODEL_CLASSES = {
-    "xlmroberta": (XLMRobertaConfig, XLMRobertaForSequenceClassification, XLMRobertaTokenizer),
-    "bert": (BertConfig, BertForMultiLabelSequenceClassification, BertTokenizer),
+    "xlmroberta-True": (XLMRobertaConfig, BertForMLSCWithLabelAttention, XLMRobertaTokenizer),
+    "bert-True": (BertConfig, BertForMLSCWithLabelAttention, BertTokenizer),
+    "xlmroberta-False": (XLMRobertaConfig, BertForMultiLabelSequenceClassification, XLMRobertaTokenizer),
+    "bert-False": (BertConfig, BertForMultiLabelSequenceClassification, BertTokenizer),
+
 }
 
 
@@ -310,7 +475,7 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 
-def train(args, train_dataset, model, tokenizer, class_weights):
+def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
     """ Train the model """
     if args.local_rank in [-1, 0]:
         tb_writer = SummaryWriter()
@@ -322,6 +487,16 @@ def train(args, train_dataset, model, tokenizer, class_weights):
         train_dataloader = list(train_dataloader)
     else:
         train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
+
+    label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
+
+    # for d in train_dataloader:
+    #     print(d)
+    #     print("len(d)", len(d))
+    #     print("type(d)", type(d))
+    #     # print(d[0].shape)
+    #     # print(d[1].shape)
+    #     print("*"*100)
 
     if args.max_steps > 0:
         t_total = args.max_steps
@@ -359,6 +534,8 @@ def train(args, train_dataset, model, tokenizer, class_weights):
         except ImportError:
             raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
         model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level)
+
+    model.initialize_label_data(next(iter(label_dataloader)))
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
@@ -409,12 +586,13 @@ def train(args, train_dataset, model, tokenizer, class_weights):
         epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0],
     )
     set_seed(args)  # Added here for reproductibility
+
     for _ in train_iterator:
         if args.doc_batching:
             random.shuffle(train_dataloader)
         epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
-
+            # label_data = next(iter(label_dataloader))
             # Skip past any already trained steps if resuming training
             if steps_trained_in_current_epoch > 0:
                 steps_trained_in_current_epoch -= 1
@@ -512,7 +690,7 @@ def evaluate(args, model, tokenizer, prefix=""):
 
     results = {}
 
-    eval_dataset, idx2id = load_and_cache_examples(args, tokenizer, evaluate=True)
+    eval_dataset, label_dataset, idx2id = load_and_cache_examples(args, tokenizer, evaluate=True, label_data=True)
 
     if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(eval_output_dir)
@@ -520,10 +698,14 @@ def evaluate(args, model, tokenizer, prefix=""):
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
     # Note that DistributedSampler samples randomly
     eval_sampler = SequentialSampler(eval_dataset) if args.local_rank == -1 else DistributedSampler(eval_dataset)
+
     if args.doc_batching:
         eval_dataloader = DataLoader(eval_dataset, sampler=None, batch_size=1, collate_fn=my_collate)
     else:
         eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+
+    label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
+    model.initialize_label_data(next(iter(label_dataloader)))
 
     # Eval!
     logger.info("***** Running evaluation {} *****".format(prefix))
@@ -534,8 +716,11 @@ def evaluate(args, model, tokenizer, prefix=""):
     preds = None
     out_label_ids = None
     ids = []
+
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
+        # label_data = next(iter(label_dataloader))
         model.eval()
+        # batch = tuple(t.to(args.device) for t in batch)
 
         if args.doc_batching:
             batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
@@ -544,8 +729,7 @@ def evaluate(args, model, tokenizer, prefix=""):
 
         with torch.no_grad():
 
-
-            #############################
+            ##############################
             if args.doc_batching:
                 input_ids = batch[0][0]
                 attn_mask = batch[1][0]
@@ -560,49 +744,13 @@ def evaluate(args, model, tokenizer, prefix=""):
             if args.model_type == 'bert':
                 inputs['token_type_ids'] = batch[-1]
 
-
             #############################
 
-
-            # if args.doc_batching:
-            #     # print(batch[3])
-            #     # labs = batch[3][0][0,:]
-            #     labs = batch[3][0]
-            #     # rnks = batch[-1][0][0, :]
-            #     rnks = batch[-1][0]
-            #
-            #     # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
-            #     inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs, "ranks": rnks}
-            # else:
-            #     labs = batch[3][0]
-            #     rnks = batch[-1][0]
-            #     inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labs, "ranks": rnks}
-            # inputs = {'input_ids': batch[0],
-            #           'attention_mask': batch[1],
-            #           'token_type_ids': batch[2] if args.model_type in ['bert', 'xlnet'] else None,
-            #           # XLM and RoBERTa don't use segment_ids
-            #           'labels': batch[3]}
-
-            #             inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
-
-            outputs = model(**inputs)
             tmp_eval_loss, logits = outputs[:2]
 
             eval_loss += tmp_eval_loss.mean().item()
         nb_eval_steps += 1
 
-        # if preds is None:
-        #     preds = logits.detach().cpu().numpy()
-        #     out_label_ids = batch[3].detach().cpu().numpy()
-        # else:
-        #     preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-        #     # print(len(preds))
-        #     out_label_ids = np.append(out_label_ids, batch[3].detach().cpu().numpy(), axis=0)
-        # if len(ids) == 0:
-        #     ids.append(batch[4].detach().cpu().numpy())
-        # else:
-        #     ids[0] = np.append(
-        #         ids[0], batch[4].detach().cpu().numpy(), axis=0)
         if preds is None:
             # preds = logits.detach().cpu().numpy()
             preds = logits.detach().cpu().numpy()
@@ -632,19 +780,40 @@ def evaluate(args, model, tokenizer, prefix=""):
                 ids[0] = np.append(
                     ids[0], batch[4].detach().cpu().numpy(), axis=0)
 
+        # if preds is None:
+        #     preds = logits.detach().cpu().numpy()
+        #     out_label_ids = batch[3][0].detach().cpu().numpy()
+        #     # if args.doc_batching:
+        #     #     out_label_ids = batch[3][0][0,:].detach().cpu().numpy()
+        #     # else:
+        #     #     out_label_ids = batch[3][0].detach().cpu().numpy()
+        # else:
+        #     preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
+        #     out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
+        #     # print(len(preds))
+        #     # if args.doc_batching:
+        #     #     out_label_ids = np.append(out_label_ids, batch[3][0][0,:].detach().cpu().numpy(), axis=0)
+        #     # else:
+        #     #     out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
+        # if len(ids) == 0:
+        #     ids.append(batch[4][0].detach().cpu().numpy().item())
+        # else:
+        #     if args.doc_batching:
+        #         ids.append(batch[4][0].detach().cpu().numpy().item())
+        #     else:
+        #         ids[0] = np.append(
+        #             ids[0], batch[4][0].detach().cpu().numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
 
-    preds = preds.reshape((len(eval_dataset), args.num_labels)) ### added
-    out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels)) ### added
+    preds = preds.reshape((len(eval_dataset), args.num_labels))
+    out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
 
     preds = sigmoid(preds)
 
-
-
     # preds = (preds > args.prediction_threshold).astype(int)
 
-    preds[preds<args.prediction_threshold] = 0
+    preds[preds < args.prediction_threshold] = 0
     sorted_preds_idx = np.flip(np.argsort(preds))
     preds = (preds > args.prediction_threshold)
 
@@ -653,26 +822,16 @@ def evaluate(args, model, tokenizer, prefix=""):
     result = acc_and_f1(preds, out_label_ids)
     results.update(result)
 
-    # n_labels = np.sum(preds, axis=1)
-    # # n_labels = np.sum(preds)
-    # preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
-    # # preds = np.array(sorted_preds_idx[:n_labels])
-
-    # print(preds.shape)
-    # print(labels)
-
     n_labels = np.sum(preds, axis=1)
     avg_pred_n_labels = np.mean(n_labels)
     avg_true_n_labels = np.mean(np.sum(out_label_ids, axis=1))
-    preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
+    preds = np.array([sorted_preds_idx[i, :n] for i, n in enumerate(n_labels)])
+
+    # preds = np.array(sorted_preds_idx[:n_labels])
 
     if not args.doc_batching:
         ids = ids[0]
     # ids = np.array([i for i in range(ids[-1]+1)])
-
-
-
-
 
     with open(os.path.join(args.data_dir, "mlb_{}_{}.p".format(args.label_threshold, args.ignore_labelless_docs)),
               "rb") as rf:
@@ -680,6 +839,7 @@ def evaluate(args, model, tokenizer, prefix=""):
     # preds = [mlb.classes_[preds[i, :].astype(bool)].tolist() for i in range(preds.shape[0])]
 
     preds = [mlb.classes_[preds[i][:]].tolist() for i in range(preds.shape[0])]
+    # preds = mlb.classes_[preds[:]].tolist()
 
     id2preds = {val: preds[i] for i, val in enumerate(ids)}
     preds = [id2preds[val] if val in id2preds else [] for i, val in enumerate(ids)]
@@ -694,12 +854,6 @@ def evaluate(args, model, tokenizer, prefix=""):
     eval_cmd = 'python cantemist-evaluation-library/src/main.py -g ' \
                'cantemist/dev-set1-to-publish/cantemist-coding/dev1-coding.tsv -p {}/preds_development.tsv ' \
                '-c cantemist-evaluation-library/valid-codes.tsv -s coding'.format(args.output_dir)
-    # eval_cmd = eval_cmd.format(
-    #     "../CLEF_Datasets_ICD/2019_German/nts-icd_train/ids_development.txt",
-    #     "../CLEF_Datasets_ICD/2019_German/nts-icd_train/anns_train_dev.txt",
-    #     "{}/preds_development.txt".format(args.output_dir),
-    #     "challenge_eval_output.txt"
-    # )
 
     output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
     with open(output_eval_file, "w") as writer:
@@ -707,15 +861,15 @@ def evaluate(args, model, tokenizer, prefix=""):
         for key in sorted(result.keys()):
             logger.info("  %s = %s", key, str(result[key]))
             writer.write("%s = %s\n" % (key, str(result[key])))
+
         eval_results = os.popen(eval_cmd).read()
         print("*** Eval results with challenge script: *** ")
         print(eval_results)
         writer.write(eval_results)
-        temp = "Average #labels/doc preds: " + str(avg_pred_n_labels) +\
+        temp = "Average #labels/doc preds: " + str(avg_pred_n_labels) + \
                "\nAverage #labels/doc true: " + str(avg_true_n_labels)
         writer.write(temp)
         print(temp)
-
 
     return results
 
@@ -725,15 +879,18 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
 
     results = {}
 
-    test_dataset, idx2id = load_and_cache_examples(args, tokenizer, test=True)
+    test_dataset, label_dataset, idx2id = load_and_cache_examples(args, tokenizer, test=True, label_data=True)
 
     if not os.path.exists(test_output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(test_output_dir)
 
     args.test_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
     # Note that DistributedSampler samples randomly
+
     test_sampler = SequentialSampler(test_dataset) if args.local_rank == -1 else DistributedSampler(test_dataset)
     test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.test_batch_size)
+    label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
+    model.initialize_label_data(next(iter(label_dataloader)))
 
     # Predict!
     logger.info("***** Running test {} *****".format(prefix))
@@ -751,7 +908,7 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
         batch = tuple(t.to(args.device) for t in batch)
 
         with torch.no_grad():
-            inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3]}
 
             outputs = model(**inputs)
             tmp_eval_loss, logits = outputs[:2]
@@ -770,7 +927,6 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
                 ids[0], batch[4].detach().cpu().numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
-
     preds = sigmoid(preds)
 
     preds = (preds > args.prediction_threshold).astype(int)
@@ -834,7 +990,6 @@ def evaluate_test_preds(args):
     print(eval_results)
 
 
-
 def main():
     parser = argparse.ArgumentParser()
 
@@ -877,7 +1032,7 @@ def main():
         help="Threshold at which to decide between 0 and 1 for labels.",
     )
     parser.add_argument(
-        "--loss_fct", default="bce", type=str, help="The loss function to use.",
+        "--loss_fct", default="none", type=str, help="The function to use.",
     )
     parser.add_argument(
         "--config_name", default="", type=str, help="Pretrained config name or path if not the same as model_name",
@@ -901,11 +1056,19 @@ def main():
         help="The maximum total input sequence length after tokenization. Sequences longer "
              "than this will be truncated, sequences shorter will be padded.",
     )
+    parser.add_argument(
+        "--label_max_seq_length",
+        default=10,
+        type=int,
+        help="The maximum total input sequence length after tokenization. Sequences longer "
+             "than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument("--label_threshold", type=int, default=0, help="Exclude labels which occur <= threshold")
     parser.add_argument("--logit_aggregation", type=str, default='max', help="Whether to aggregate logits by max value "
                                                                              "or average value. Options:"
                                                                              "'--max', '--avg'")
     parser.add_argument("--preprocess", action="store_true", help="Whether to do the initial processing of the data.")
+    parser.add_argument("--label_attention", action="store_true", help="Whether to use the label attention model")
     parser.add_argument("--ignore_labelless_docs", action="store_true",
                         help="Whether to ignore the documents which have no labels.")
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
@@ -930,16 +1093,18 @@ def main():
         default=1,
         help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
+    parser.add_argument('--make_plots', action='store_true', help="Whether to make plots on data.")
     parser.add_argument('--do_iterative_class_weights', action='store_true', help="Whether to use iteratively "
                                                                                   "calculated class weights")
     parser.add_argument('--do_normal_class_weights', action='store_true', help="Whether to use normally "
-                                                                                  "calculated class weights")
+                                                                               "calculated class weights")
     parser.add_argument('--do_ranking_loss', action='store_true', help="Whether to use the ranking loss component.")
-    parser.add_argument('--do_weighted_ranking_loss', action='store_true', help="Whether to use the weighted ranking "
-                                                                                "loss component.")
+    parser.add_argument('--do_weighted_ranking_loss', action='store_true',
+                        help="Whether to use the weighted ranking loss component.")
     parser.add_argument('--do_experimental_ranks_instead_of_labels', action='store_true', help='Whether to send ranks '
                                                                                                'instead of binary labels to loss function')
     parser.add_argument('--doc_batching', action='store_true', help="Whether to fit one document into a batch during")
+
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
     parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
@@ -947,7 +1112,6 @@ def main():
     parser.add_argument(
         "--num_train_epochs", default=3.0, type=float, help="Total number of training epochs to perform.",
     )
-    parser.add_argument('--make_plots', action='store_true', help="Whether to make plots on data.")
     parser.add_argument(
         "--max_steps",
         default=-1,
@@ -1060,7 +1224,6 @@ def main():
         # german_reader = GermanReader(args)
         # german_reader.process_data()
         processor = MyProcessor(args)
-
     class_weights = processor.get_class_weights()
     label_list = processor.get_labels()
     num_labels = len(label_list)
@@ -1071,7 +1234,7 @@ def main():
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
 
     args.model_type = args.model_type.lower()
-    config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type + '-' + str(args.label_attention)]
     config = config_class.from_pretrained(
         args.config_name if args.config_name else args.model_name_or_path,
         num_labels=num_labels,
@@ -1083,14 +1246,6 @@ def main():
         do_lower_case=args.do_lower_case,
         cache_dir=args.cache_dir if args.cache_dir else None,
     )
-    # model = model_class.from_pretrained(
-    #     args.model_name_or_path,
-    #     from_tf=bool(".ckpt" in args.model_name_or_path),
-    #     config=config,
-    #     cache_dir=args.cache_dir if args.cache_dir else None,
-    #     num_labels=num_labels,
-    #     loss_fct=args.loss_fct
-    # )
     model = model_class.from_pretrained(
         args.model_name_or_path,
         from_tf=bool(".ckpt" in args.model_name_or_path),
@@ -1099,6 +1254,9 @@ def main():
         args=args,
         class_weights=class_weights,
     )
+
+    # model = model_class()
+
     # for name, param in model.named_parameters():
     #     if param.requires_grad:
     #         print(name)
@@ -1112,8 +1270,9 @@ def main():
 
     # Training
     if args.do_train:
-        train_dataset, idx2id = load_and_cache_examples(args, tokenizer, evaluate=False)
-        global_step, tr_loss = train(args, train_dataset, model, tokenizer, class_weights)
+        train_dataset, label_dataset, idx2id = load_and_cache_examples(args, tokenizer, evaluate=False, label_data=True)
+
+        global_step, tr_loss = train(args, train_dataset, label_dataset, model, tokenizer, class_weights)
         logger.info(" global_step = %s, average loss = %s", global_step, tr_loss)
 
     # Saving best-practices: if you use defaults names for the model, you can reload it using from_pretrained()
@@ -1135,7 +1294,7 @@ def main():
         torch.save(args, os.path.join(args.output_dir, "training_args.bin"))
 
         # Load a trained model and vocabulary that you have fine-tuned
-        model = model_class.from_pretrained(args.output_dir, args=args, loss_fct=args.loss_fct)
+        model = model_class.from_pretrained(args.output_dir, loss_fct=args.loss_fct, args=args)
         tokenizer = tokenizer_class.from_pretrained(args.output_dir)
         model.to(args.device)
 
@@ -1153,16 +1312,7 @@ def main():
         for checkpoint in checkpoints:
             global_step = checkpoint.split("-")[-1] if len(checkpoints) > 1 else ""
             prefix = checkpoint.split("/")[-1] if checkpoint.find("checkpoint") != -1 else ""
-
-            model = model_class.from_pretrained(args.output_dir, loss_fct=args.loss_fct, args=args)
-            # model = model_class.from_pretrained(
-            #     checkpoint,
-            #     from_tf=bool(".ckpt" in args.model_name_or_path),
-            #     config=config,
-            #     cache_dir=args.cache_dir if args.cache_dir else None,
-            #     num_labels=num_labels,
-            #     loss_fct=args.loss_fct
-            # )
+            model = model_class.from_pretrained(checkpoint, loss_fct=args.loss_fct, args=args)
             model.to(args.device)
             result = evaluate(args, model, tokenizer, prefix=prefix)
             result = dict((k + "_{}".format(global_step), v) for k, v in result.items())
@@ -1176,7 +1326,8 @@ def main():
             checkpoints = [args.output_dir]
             if args.eval_all_checkpoints:
                 checkpoints = list(
-                    os.path.dirname(c) for c in sorted(glob.glob(args.output_dir + "/**/" + WEIGHTS_NAME, recursive=True))
+                    os.path.dirname(c) for c in
+                    sorted(glob.glob(args.output_dir + "/**/" + WEIGHTS_NAME, recursive=True))
                 )
                 logging.getLogger("transformers.modeling_utils").setLevel(logging.WARN)  # Reduce logging
             logger.info("Evaluate the following checkpoints: %s", checkpoints)
@@ -1188,9 +1339,14 @@ def main():
                 predictions = generate_test_preds(args, model, tokenizer, prefix=global_step)
         evaluate_test_preds(args)
 
-
     return results
 
 
 if __name__ == '__main__':
     main()
+
+    """
+    Next steps: rewrite predict() function so I can evaluate on the test set, against:
+        1) FULL labels
+        2) ignoring labelless docs (set a flag for this)
+    """
