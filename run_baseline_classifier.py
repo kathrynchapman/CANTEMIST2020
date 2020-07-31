@@ -651,6 +651,9 @@ def evaluate(args, model, tokenizer, prefix=""):
     # preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
     # # preds = np.array(sorted_preds_idx[:n_labels])
 
+    print(preds.shape)
+    print(labels.shape)
+
     n_labels = np.sum(preds, axis=1)
     avg_pred_n_labels = np.mean(n_labels)
     avg_true_n_labels = np.mean(np.sum(labels, axis=1))
