@@ -22,7 +22,7 @@ class LanguageModelingDataReader():
         self.test_path = os.path.join(cantemist_path, "test-background-set-to-publish/")
         self.dev_path = os.path.join(cantemist_path, "dev-set1-to-publish/")
         self.data_list = []
-        self.tokenizer = XLMRobertaTokenizer.from_pretrained(self.args.model_name)
+        self.tokenizer = XLMRobertaTokenizer.from_pretrained(self.args.model_name_or_path)
 
     def construct_data_dict(self, train=False, test=False):
         """
@@ -51,7 +51,7 @@ class LanguageModelingDataReader():
 
     def write_data(self):
         with open(
-            out_path + cantemist_path + 'LM_{}_{}_{}.txt'.format(self.args.model_name, str(self.args.msl), str(self.args.stride)),
+            out_path + cantemist_path + 'LM_{}_{}_{}.txt'.format(self.args.model_name_or_path, str(self.args.msl), str(self.args.stride)),
             'w') as f:
             for line in self.data_list:
                 f.write(line + '\n')
@@ -60,7 +60,7 @@ class LanguageModelingDataReader():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--preprocess', action='store_true', help="Whether to redo all of the pre-processing.")
-    parser.add_argument('--model_name', type=str, help="What type of BERT flavor we're working with")
+    parser.add_argument('--model_name_or_path', type=str, help="What type of BERT flavor we're working with")
     parser.add_argument('--msl', type=int, default=512, help="Intended max seq len")
     parser.add_argument('--stride', type=int, default=75, help="Overlap between documents")
 
