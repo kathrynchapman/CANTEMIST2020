@@ -9,7 +9,7 @@ models = ['baseline', 'label_attention']
 num_epohcs = ['any int']
 doc_batching = ['no_doc_batching', 'doc_batching_max']
 ranking_loss = ['no_ranking_loss', 'ranking_loss', 'weighted_ranking_loss']
-class_weights = ['no_class_weights, ''dynamic_class_weights', 'static_class_weights']
+class_weights = ['no_class_weights', 'dynamic_class_weights', 'static_class_weights']
 loss_function = ['bce', 'bbce', 'none', 'bce ranks', 'bbce ranks']
 
 
@@ -73,7 +73,7 @@ def fill_dict(exp_dict):
             while not valid:
                 cont = input(
                     "You already have an entry for this - do you want to continue and overwrite? [y, n, just notes]: ")
-                if cont not in ['y', 'n', 'just notes'.strip(), 1, 2, 3]:
+                if cont not in ['y', 'n', 'just notes'.strip(), '1', '2', '3']:
                     print("Sorry, didn't get that...")
                 else:
                     valid = True
