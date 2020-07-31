@@ -48,6 +48,7 @@ class LanguageModelingDataReader():
                 text = f.read().replace('\n', ' ').replace('\t', ' ')
                 sentences = sent_tokenize(text)
 
+
                 tokens = self.tokenizer.tokenize(text)
                 while tokens:
                     self.data_list.append(self.tokenizer.convert_tokens_to_string(tokens[:512]))

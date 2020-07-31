@@ -781,8 +781,10 @@ def evaluate(args, model, tokenizer, prefix=""):
             else:
                 out_label_ids = np.append(out_label_ids, batch[3].detach().cpu().numpy(), axis=0)
 
+
         if len(ids) == 0:
             if args.doc_batching:
+                print(batch[4])
                 ids.append(batch[4][0].detach().cpu().numpy().item())
             else:
                 ids.append(batch[4].detach().cpu().numpy())
