@@ -139,7 +139,7 @@ class LineByLineTextDataset(Dataset):
 
         with open(file_path, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if (len(line) > 0 and not line.isspace())]
-        lines = [l.split('\t')[1] for l in lines]
+        # lines = [l.split('\t')[1] for l in lines]
 
         self.examples = tokenizer.batch_encode_plus(lines, add_special_tokens=True, max_length=block_size)["input_ids"]
 
