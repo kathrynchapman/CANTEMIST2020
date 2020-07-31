@@ -759,7 +759,7 @@ def evaluate(args, model, tokenizer, prefix=""):
                 inputs['token_type_ids'] = batch[-1]
 
             #############################
-
+            outputs = model(**inputs)
             tmp_eval_loss, logits = outputs[:2]
 
             eval_loss += tmp_eval_loss.mean().item()

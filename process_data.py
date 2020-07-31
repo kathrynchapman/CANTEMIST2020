@@ -74,7 +74,6 @@ class CantemistReader():
                 if test:
                     id_list.append(f_name[:-4])
 
-
     def construct_label_dict(self, train=False):
         """
         Creates the dictionary containing the labels for all documents
@@ -329,31 +328,13 @@ class CantemistReader():
             else:
                 labels_binarized = self.mlb.transform(labels)
 
-            # print(min(sum(l) for l in labels_binarized))
-            # print(max(sum(l) for l in labels_binarized))
-
             labels_ranked = labels_binarized.copy()
 
             for l_str, l_bin in zip(labels, labels_ranked):
-                idx2rank = {}
-                # print(l_str)
-                # print(l_bin.tolist())
                 for rank, l in enumerate(l_str):
                     idx = np.where(self.mlb.classes_ == l)
                     l_bin[idx] = len(l_str) - rank
-                # print(l_str)
-                # print(l_bin.tolist())
 
-                # print(l_bin.tolist()[0])
-            # print(labels_binarized)
-            # labels_binarized = np.array([normalize(l_bin.reshape(1, -1), norm="max") for l_bin in labels_binarized])
-            # # l_bin = normalize(l_bin.reshape(1, -1), norm="max")
-            # for l_bin in labels_binarized:
-            #     l_bin[l_bin == 0] = -1
-            # for one, two in zip(labels_binarized, labels_binary):
-            #     print(one.tolist())
-            #     print(two.tolist())
-            #     print('_'*100)
 
             if data_type == self.test_file:
                 data = [(data.iloc[idx, 0], data.iloc[idx, 1], None, None) for idx in range(len(data))]
