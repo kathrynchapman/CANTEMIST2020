@@ -8,6 +8,9 @@ cantemist_path = "cantemist/"
 out_path = "processed_data/"
 if not os.path.exists(out_path):
     os.mkdir(out_path)
+if not os.path.exists(out_path + cantemist_path):
+    os.mkdir(out_path + cantemist_path)
+
 
 
 def save(fname, data):
