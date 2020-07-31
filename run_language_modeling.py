@@ -29,6 +29,7 @@ import random
 import re
 import shutil
 from typing import Dict, List, Tuple
+from create_language_modeling_files import *
 
 import numpy as np
 import torch
