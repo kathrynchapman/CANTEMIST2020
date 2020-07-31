@@ -175,12 +175,14 @@ def viewall(exp_dict):
                             r = exp_dict[m][n_ep][db][rl][cw][lf]['R']
                             notes = exp_dict[m][n_ep][db][rl][cw][lf]['Notes']
                             ed = exp_dict[m][n_ep][db][rl][cw][lf]['Entry Date']
+
                             m_ = 'label attn' if m == 'label_attention' else m
                             rl_ = 'Y' if rl == 'ranking_loss' else 'N'
-                            d = 'N' if db == 'no_doc_batching' else db[-3:]
-                            c = 'N' if cw == 'no_class_weights' else cw
+                            db_ = 'N' if db == 'no_doc_batching' else db[-3:]
+                            cw_ = 'N' if cw == 'no_class_weights' else cw
                             ed = 'N/A' if ed == 0.0 else ed
-                            table.rows.append([m_, n_ep, d, rl_, c, lf, map, f1, p, r, notes, ed])
+
+                            table.rows.append([m_, n_ep, db_, rl_, cw_, lf, map, f1, p, r, notes, ed])
     print(table)
     # print("Results for {}, {}, {}, {}, {}, {}".format(m, n_ep, db, rl, cw, lf))
     # print("MAP:", exp_dict[m][n_ep][db][rl][cw][lf]['MAP'])
@@ -262,8 +264,11 @@ def show_remaining_exps(exp_dict):
                 for rl in ranking_loss:
                     for cw in class_weights:
                         for lf in loss_function:
-                            if not exp_dict[m][n_ep][db][rl][cw][lf]['MAP']:
-                                table.rows.append([m, n_ep, db, rl, cw, lf])
+                            if not exp_dict[m]['45'][db][rl][cw][lf]['MAP']:
+                                if not (lf == 'none' and rl == 'no_ranking_loss'):
+                                    if not (rl == 'weighted_ranking_loss' and cw == 'no_class_weights'):
+                                        if not (rl!= 'weighted_ranking_loss' and lf[-5:] == 'ranks'):
+                                            table.rows.append([m, n_ep, db, rl, cw, lf])
     print(table)
 
 

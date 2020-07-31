@@ -656,6 +656,7 @@ def evaluate(args, model, tokenizer, prefix=""):
     preds[preds<args.prediction_threshold] = 0
     sorted_preds_idx = np.flip(np.argsort(preds))
     preds = (preds > args.prediction_threshold)
+    print(preds.shape)
 
 
     result = acc_and_f1(preds, out_label_ids)
