@@ -95,7 +95,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         if self.args.model_type == 'bert':
             self.bert = BertModel(config)
         elif self.args.model_type == 'xlmroberta':
-            self.bert = XLMRobertaModel(config)
+            self.roberta = XLMRobertaModel(config)
         self.num_labels = args.num_labels
         self.label_data = ''
         if not class_weights:
@@ -163,26 +163,46 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         """
 
         # print("doc_input_ids.shape".upper(), doc_input_ids.shape)
+        if self.args.model_type == 'xlmroberta':
+            doc_outputs = self.roberta(
+                doc_input_ids,
+                attention_mask=doc_attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
 
-        doc_outputs = self.bert(
-            doc_input_ids,
-            attention_mask=doc_attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            # output_attentions=output_attentions,
-        )
+            label_outputs = self.roberta(
+                self.label_data[0].cuda(),
+                attention_mask=self.label_data[1].cuda(),
+                # token_type_ids=token_type_ids,
+                # position_ids=position_ids,
+                # head_mask=head_mask,
+                # inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
+        elif self.args.model_type == 'bert':
+            doc_outputs = self.bert(
+                doc_input_ids,
+                attention_mask=doc_attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
 
-        label_outputs = self.bert(
-            self.label_data[0].cuda(),
-            attention_mask=self.label_data[1].cuda(),
-            # token_type_ids=token_type_ids,
-            # position_ids=position_ids,
-            # head_mask=head_mask,
-            # inputs_embeds=inputs_embeds,
-            # output_attentions=output_attentions,
-        )
+            label_outputs = self.bert(
+                self.label_data[0].cuda(),
+                attention_mask=self.label_data[1].cuda(),
+                # token_type_ids=token_type_ids,
+                # position_ids=position_ids,
+                # head_mask=head_mask,
+                # inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
 
         # get the sequence-level document representations
         doc_seq_output = doc_outputs[0]
