@@ -657,13 +657,14 @@ def evaluate(args, model, tokenizer, prefix=""):
     sorted_preds_idx = np.flip(np.argsort(preds))
     preds = (preds > args.prediction_threshold)
 
+    assert preds.shape == out_label_ids.shape
 
     result = acc_and_f1(preds, out_label_ids)
     results.update(result)
 
     n_labels = np.sum(preds, axis=1)
     avg_pred_n_labels = np.mean(n_labels)
-    avg_true_n_labels = np.mean(np.sum(labels, axis=1))
+    avg_true_n_labels = np.mean(np.sum(out_label_ids, axis=1))
     preds = np.array([sorted_preds_idx[i, :n] for i, n in enumerate(n_labels)])
 
     # preds = np.array(sorted_preds_idx[:n_labels])
