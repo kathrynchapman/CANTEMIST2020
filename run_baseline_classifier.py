@@ -426,8 +426,10 @@ def train(args, train_dataset, model, tokenizer, class_weights):
             else:
                 batch = tuple(t.to(args.device) for t in batch)
 
-            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3], "ranks": batch[-1]}
-            # inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[2], "ranks": batch[4]}
+            if args.model_type == 'bert':
+                inputs['token_type_ids'] = batch[-1]
+
             outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
 
@@ -547,14 +549,17 @@ def evaluate(args, model, tokenizer, prefix=""):
             if args.doc_batching:
                 input_ids = batch[0][0]
                 attn_mask = batch[1][0]
-                labels = batch[3][0]
-                ranks = batch[-1][0]
+                labels = batch[2][0]
+                ranks = batch[4][0]
             else:
                 input_ids = batch[0]  # may need to fix this!
                 attn_mask = batch[1]  # may need to fix this!
-                labels = batch[3]
-                ranks = batch[-1]
+                labels = batch[2]
+                ranks = batch[4]
             inputs = {"doc_input_ids": input_ids, "doc_attention_mask": attn_mask, "labels": labels, "ranks": ranks}
+            if args.model_type == 'bert':
+                inputs['token_type_ids'] = batch[-1]
+
 
             #############################
 

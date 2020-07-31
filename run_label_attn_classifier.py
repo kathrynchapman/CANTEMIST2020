@@ -197,7 +197,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
             label_outputs = self.bert(
                 self.label_data[0].cuda(),
                 attention_mask=self.label_data[1].cuda(),
-                # token_type_ids=token_type_ids,
+                token_type_ids=self.label_data[-1].cuda(),
                 # position_ids=position_ids,
                 # head_mask=head_mask,
                 # inputs_embeds=inputs_embeds,
@@ -439,17 +439,12 @@ def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
             else:
                 batch = tuple(t.to(args.device) for t in batch)
 
-            # inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3],
-            #           "label_desc_input_ids": label_data[0], "label_desc_attention_mask": label_data[1]}
 
-            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3], "ranks": batch[-1]}
-            # print(inputs)
-            # inputs = {k: v.reshape(v.shape[1:]) for k, v in inputs.items()}
-            # if args.do_ranking_loss:
-            #     inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3], "ranks": batch[-1]}
-            # else:
-            #     inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3]}
-            # print(inputs)
+
+            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[2], "ranks": batch[4]}
+            if args.model_type == 'bert':
+                inputs['token_type_ids'] = batch[-1]
+
 
             outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
@@ -579,36 +574,20 @@ def evaluate(args, model, tokenizer, prefix=""):
             if args.doc_batching:
                 input_ids = batch[0][0]
                 attn_mask = batch[1][0]
-                labels = batch[3][0]
-                ranks = batch[-1][0]
+                labels = batch[2][0]
+                ranks = batch[4][0]
             else:
                 input_ids = batch[0]  # may need to fix this!
                 attn_mask = batch[1]  # may need to fix this!
-                labels = batch[3]
-                ranks = batch[-1]
+                labels = batch[2]
+                ranks = batch[4]
             inputs = {"doc_input_ids": input_ids, "doc_attention_mask": attn_mask, "labels": labels, "ranks": ranks}
+            if args.model_type == 'bert':
+                inputs['token_type_ids'] = batch[-1]
+
 
             #############################
-            # if args.doc_batching:
-            #     # print(batch[3])
-            #     # labs = batch[3][0][0,:]
-            #     labs = batch[3][0]
-            #     # rnks = batch[-1][0][0, :]
-            #     rnks = batch[-1][0]
-            #
-            #     # inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": batch[3][0], "ranks": batch[-1][0]}
-            #     inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labs, "ranks": rnks}
-            # else:
-            #     labs = batch[3][0]
-            #     rnks = batch[-1][0]
-            #     inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labs, "ranks": rnks}
-            outputs = model(**inputs)
-            # try:
-            #     outputs = model(**inputs)
-            # except:
-            #     # print("IDS!!!!!!!!!", batch[4][0])
-            #     # print("IDS!!!!!!!!! - TYPE ", type(batch[4][0][0].item()))
-            #     print("IDS!!!!!!!!!", idx2id[batch[4][0][0].item()])
+
             tmp_eval_loss, logits = outputs[:2]
 
             eval_loss += tmp_eval_loss.mean().item()

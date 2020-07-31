@@ -18,15 +18,26 @@ class BatchedDataset(Dataset):
         self.tensor2 = tensors[2]
         self.tensor3 = tensors[3]
         self.tensor4 = tensors[4]
-        self.tensor5 = tensors[5]
+        try:
+            self.tensor5 = tensors[5]
+        except:
+            self.tensor5 = None
 
     def __getitem__(self, index):
-        t = (self.tensor0[index],
-             self.tensor1[index],
-             self.tensor2[index],
-             self.tensor3[index],
-             self.tensor4[index],
-             self.tensor5[index],)
+        if self.tensor5 is not None:
+            t = (self.tensor0[index],
+                 self.tensor1[index],
+                 self.tensor2[index],
+                 self.tensor3[index],
+                 self.tensor4[index],
+                 self.tensor5[index],)
+        else:
+            t = (self.tensor0[index],
+                 self.tensor1[index],
+                 self.tensor2[index],
+                 self.tensor3[index],
+                 self.tensor4[index],)
+
         return t
 
     def __len__(self):
@@ -455,8 +466,8 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
         all_label_ranks = [torch.tensor(f.label_ranks, dtype=torch.long) for f in doc_features]
         if not args.model_type == 'xlmroberta':
             all_token_type_ids = [torch.tensor(f.segment_ids, dtype=torch.long) for f in doc_features]
-            doc_dataset = BatchedDataset([all_input_ids, all_attention_mask, all_token_type_ids, all_labels,
-                                        all_doc_ids, all_label_ranks])
+            doc_dataset = BatchedDataset([all_input_ids, all_attention_mask, all_labels,
+                                        all_doc_ids, all_label_ranks, all_token_type_ids])
         else:
             doc_dataset = BatchedDataset([all_input_ids, all_attention_mask, all_labels,
                                           all_doc_ids, all_label_ranks])
@@ -468,8 +479,8 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
         all_label_ranks = torch.tensor([f.label_ranks for f in doc_features], dtype=torch.long)
         if not args.model_type == 'xlmroberta':
             all_token_type_ids = torch.tensor([f.segment_ids for f in doc_features], dtype=torch.long)
-            doc_dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels,
-                                        all_doc_ids, all_label_ranks)
+            doc_dataset = TensorDataset(all_input_ids, all_attention_mask, all_labels,
+                                        all_doc_ids, all_label_ranks, all_token_type_ids)
         else:
             doc_dataset = TensorDataset(all_input_ids, all_attention_mask, all_labels,
                                         all_doc_ids, all_label_ranks)
