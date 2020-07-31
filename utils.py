@@ -539,19 +539,24 @@ class MyDataParallel(torch.nn.DataParallel):
                                    "on device {} (device_ids[0]) but found one of "
                                    "them on device: {}".format(self.src_device_obj, t.device))
 
-        try:
-            kwargs = tuple({'doc_input_ids': kwargs['doc_input_ids'][i].to('cuda:{}'.format(i)),
-                            'doc_attention_mask': kwargs['doc_attention_mask'][i].to('cuda:{}'.format(i)),
-                            'labels': kwargs['labels'][i].to('cuda:{}'.format(i)),
-                            'ranks': kwargs['ranks'][i].to('cuda:{}'.format(i)),
-                            'token_type_ids': kwargs['token_type_ids'][i].to('cuda:{}'.format(i)),
-                            } for i in range(len(kwargs['doc_input_ids'])))
-        except:
-            kwargs = tuple({'doc_input_ids': kwargs['doc_input_ids'][i].to('cuda:{}'.format(i)),
-                            'doc_attention_mask': kwargs['doc_attention_mask'][i].to('cuda:{}'.format(i)),
-                            'labels': kwargs['labels'][i].to('cuda:{}'.format(i)),
-                            'ranks': kwargs['ranks'][i].to('cuda:{}'.format(i)),
-                            } for i in range(len(kwargs['doc_input_ids'])))
+        # try:
+        #     kwargs = tuple({'doc_input_ids': kwargs['doc_input_ids'][i].to('cuda:{}'.format(i)),
+        #                     'doc_attention_mask': kwargs['doc_attention_mask'][i].to('cuda:{}'.format(i)),
+        #                     'labels': kwargs['labels'][i].to('cuda:{}'.format(i)),
+        #                     'ranks': kwargs['ranks'][i].to('cuda:{}'.format(i)),
+        #                     'token_type_ids': kwargs['token_type_ids'][i].to('cuda:{}'.format(i)),
+        #                     } for i in range(len(kwargs['doc_input_ids'])))
+        # except:
+        #     kwargs = tuple({'doc_input_ids': kwargs['doc_input_ids'][i].to('cuda:{}'.format(i)),
+        #                     'doc_attention_mask': kwargs['doc_attention_mask'][i].to('cuda:{}'.format(i)),
+        #                     'labels': kwargs['labels'][i].to('cuda:{}'.format(i)),
+        #                     'ranks': kwargs['ranks'][i].to('cuda:{}'.format(i)),
+        #                     } for i in range(len(kwargs['doc_input_ids'])))
+        kwargs = tuple({'doc_input_ids': kwargs['doc_input_ids'][i].to('cuda:{}'.format(i)),
+                        'doc_attention_mask': kwargs['doc_attention_mask'][i].to('cuda:{}'.format(i)),
+                        'labels': kwargs['labels'][i].to('cuda:{}'.format(i)),
+                        'ranks': kwargs['ranks'][i].to('cuda:{}'.format(i)),
+                        } for i in range(len(kwargs['doc_input_ids'])))
         inputs = tuple(tuple() for i in range(len(kwargs)))
 
 
