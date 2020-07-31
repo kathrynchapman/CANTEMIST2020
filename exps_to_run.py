@@ -95,12 +95,14 @@ def fill_dict(exp_dict):
         F1 = input("Enter F1: ")
         P = input("Enter P: ")
         R = input("Enter R: ")
+        avg_nlabels = input("Enter avg #label/doc: ")
         notes = input("Any notes on this? (Just type them if so): ")
 
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['MAP'] = float(MAP)
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['F1'] = float(F1)
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['P'] = float(P)
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['R'] = float(R)
+        exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Avg #Labels'] = float(avg_nlabels)
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Entry Date'] = dt_string
 
         if notes or add_to_notes:
@@ -161,8 +163,8 @@ def viewall(exp_dict):
     '''
     table = BeautifulTable(maxwidth=300)
     table.columns.header = ["Model", "#Epochs", "Doc Batching", "Ranking Loss", "Class Weights", "Loss Funct", "MAP",
-                            "F1", "P", "R", "Notes", "Entry Date"]
-    table.column_widths = [15, 9, 15, 15, 23, 15, 7, 7, 7, 7, 20, 15]
+                            "F1", "P", "R", "Avg #Labels", "Notes", "Entry Date"]
+    table.column_widths = [15, 9, 15, 15, 23, 15, 7, 7, 7, 7, 7, 20, 15]
     for m in exp_dict.keys():
         for n_ep in exp_dict[m].keys():
             for db in exp_dict[m][n_ep].keys():
@@ -174,6 +176,7 @@ def viewall(exp_dict):
                             p = exp_dict[m][n_ep][db][rl][cw][lf]['P']
                             r = exp_dict[m][n_ep][db][rl][cw][lf]['R']
                             notes = exp_dict[m][n_ep][db][rl][cw][lf]['Notes']
+                            avg_nlabels = exp_dict[m][n_ep][db][rl][cw][lf]['Avg #Labels']
                             ed = exp_dict[m][n_ep][db][rl][cw][lf]['Entry Date']
 
                             m_ = 'label attn' if m == 'label_attention' else m
@@ -181,8 +184,9 @@ def viewall(exp_dict):
                             db_ = 'N' if db == 'no_doc_batching' else db[-3:]
                             cw_ = 'N' if cw == 'no_class_weights' else cw
                             ed = 'N/A' if ed == 0.0 else ed
+                            avg_nlabels = 'N/A' if avg_nlabels == 0.0 else avg_nlabels
 
-                            table.rows.append([m_, n_ep, db_, rl_, cw_, lf, map, f1, p, r, notes, ed])
+                            table.rows.append([m_, n_ep, db_, rl_, cw_, lf, map, f1, p, r, avg_nlabels, notes, ed])
     print(table)
     # print("Results for {}, {}, {}, {}, {}, {}".format(m, n_ep, db, rl, cw, lf))
     # print("MAP:", exp_dict[m][n_ep][db][rl][cw][lf]['MAP'])
