@@ -652,6 +652,7 @@ def evaluate(args, model, tokenizer, prefix=""):
     # # preds = np.array(sorted_preds_idx[:n_labels])
 
     n_labels = np.sum(preds, axis=1)
+    print(n_labels)
     preds = np.array([sorted_preds_idx[i,:n] for i,n in enumerate(n_labels)])
 
     if not args.doc_batching:
