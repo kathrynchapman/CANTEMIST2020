@@ -24,6 +24,7 @@ from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss
 
 from transformers.modeling_bert import BertConfig, BertModel, BertPreTrainedModel
 from transformers.modeling_xlm_roberta import XLMRobertaModel
+from transformers.modeling_xlm_roberta import XLMRobertaModel, XLMRobertaConfig
 
 from tqdm import tqdm, trange
 
@@ -90,8 +91,12 @@ def acc_and_f1(preds, labels):
 class BertForMLSCWithLabelAttention(BertPreTrainedModel):
     def __init__(self, config, args='', loss_fct='', class_weights=None):
         super().__init__(config)
+        self.args = args
+        if self.args.model_type == 'bert':
+            self.bert = BertModel(config)
+        elif self.args.model_type == 'xlmroberta':
+            self.bert = XLMRobertaModel(config)
         self.num_labels = args.num_labels
-        self.bert = BertModel(config)
         self.label_data = ''
         if not class_weights:
             self.class_weights = torch.ones((self.num_labels,))
@@ -100,7 +105,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         self.iteration = 1
         self.loss_fct = loss_fct
         self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
-        self.args = args
+
         self.w1 = torch.nn.Linear(args.doc_max_seq_length, 1)
         self.w2 = torch.nn.Linear(args.label_max_seq_length, 1)
 
@@ -268,7 +273,8 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
 
 
 MODEL_CLASSES = {
-    "xlmroberta": (XLMRobertaConfig, XLMRobertaForSequenceClassification, XLMRobertaTokenizer),
+    # "xlmroberta": (XLMRobertaConfig, XLMRobertaForSequenceClassification, XLMRobertaTokenizer),
+    "xlmroberta": (XLMRobertaConfig, BertForMLSCWithLabelAttention, XLMRobertaTokenizer),
     "bert": (BertConfig, BertForMLSCWithLabelAttention, BertTokenizer),
     # "experiemnt": (BertConfig, LabelAttentionNetwork, BertTokenizer)
 }
