@@ -764,37 +764,37 @@ def evaluate(args, model, tokenizer, prefix=""):
 
             eval_loss += tmp_eval_loss.mean().item()
         nb_eval_steps += 1
-
+        # doc_dataset = TensorDataset(all_input_ids, all_attention_mask, all_labels,
+        #                                         all_doc_ids, all_label_ranks, all_token_type_ids)
         if preds is None:
             # preds = logits.detach().cpu().numpy()
             preds = logits.detach().cpu().numpy()
             if args.doc_batching:
-                out_label_ids = batch[3][0].detach().cpu().numpy()
+                out_label_ids = batch[2][0].detach().cpu().numpy()
             else:
-                out_label_ids = batch[3].detach().cpu().numpy()
+                out_label_ids = batch[2].detach().cpu().numpy()
         else:
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
             # preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
             # print(len(preds))
             if args.doc_batching:
-                out_label_ids = np.append(out_label_ids, batch[3][0].detach().cpu().numpy(), axis=0)
+                out_label_ids = np.append(out_label_ids, batch[2][0].detach().cpu().numpy(), axis=0)
             else:
-                out_label_ids = np.append(out_label_ids, batch[3].detach().cpu().numpy(), axis=0)
+                out_label_ids = np.append(out_label_ids, batch[2].detach().cpu().numpy(), axis=0)
 
 
         if len(ids) == 0:
             if args.doc_batching:
-                print(batch[4])
-                ids.append(batch[4][0].detach().cpu().numpy().item())
+                ids.append(batch[3][0].detach().cpu().numpy().item())
             else:
-                ids.append(batch[4].detach().cpu().numpy())
+                ids.append(batch[3].detach().cpu().numpy())
 
         else:
             if args.doc_batching:
-                ids.append(batch[4][0].detach().cpu().numpy().item())
+                ids.append(batch[3][0].detach().cpu().numpy().item())
             else:
                 ids[0] = np.append(
-                    ids[0], batch[4].detach().cpu().numpy(), axis=0)
+                    ids[0], batch[3].detach().cpu().numpy(), axis=0)
 
         # if preds is None:
         #     preds = logits.detach().cpu().numpy()
