@@ -154,7 +154,7 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
         loss, logits = outputs[:2]
         """
         if self.args.model_type == 'xlmroberta':
-            outputs = self.bert(
+            outputs = self.roberta(
                 doc_input_ids,
                 attention_mask=doc_attention_mask,
                 position_ids=position_ids,
