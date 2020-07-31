@@ -25,6 +25,7 @@ import math
 import os
 from dataclasses import dataclass, field
 from typing import Optional
+from create_language_modeling_files import *
 
 from transformers import (
     CONFIG_MAPPING,
@@ -75,6 +76,12 @@ class ModelArguments:
     )
     cache_dir: Optional[str] = field(
         default=None, metadata={"help": "Where do you want to store the pretrained models downloaded from s3"}
+    )
+    max_seq_len: Optional[int] = field(
+        default=512, metadata={"help": "Max seq length"}
+    )
+    stride: Optional[int] = field(
+        default=75, metadata={"help": "Overlap when constructing documents"}
     )
 
 
@@ -228,6 +235,17 @@ def main():
         data_args.block_size = min(data_args.block_size, tokenizer.max_len)
 
     # Get datasets
+
+    if not data_args.train_data_file:
+        train_data_file = 'processed_data/cantemist/LM_{}_{}_{}.txt'.format(model_args.model_name, str(model_args.msl), str(model_args.stride))
+        if not os.path.exists(train_data_file):
+            reader = LanguageModelingDataReader(model_args)
+            reader.construct_data_dict(train=True)
+            reader.construct_data_dict()
+            reader.construct_data_dict(test=True)
+            reader.write_data()
+        data_args.train_data_file = train_data_file
+
 
     train_dataset = get_dataset(data_args, tokenizer=tokenizer) if training_args.do_train else None
     eval_dataset = get_dataset(data_args, tokenizer=tokenizer, evaluate=True) if training_args.do_eval else None
