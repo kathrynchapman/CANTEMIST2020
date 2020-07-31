@@ -93,8 +93,11 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
     def __init__(self, config, args='', loss_fct='', class_weights=None):
         super().__init__(config)
         self.args = args
+        if self.args.model_type == 'bert':
+            self.bert = BertModel(config)
+        elif self.args.model_type == 'xlmroberta':
+            self.roberta = XLMRobertaModel(config)
         self.num_labels = args.num_labels
-        self.bert = BertModel(config)
         if not class_weights:
             self.class_weights = torch.ones((self.num_labels,))
         else:
@@ -150,16 +153,25 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
         outputs = model(input_ids, labels=labels)
         loss, logits = outputs[:2]
         """
-
-        outputs = self.bert(
-            doc_input_ids,
-            attention_mask=doc_attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            # output_attentions=output_attentions,
-        )
+        if self.args.model_type == 'xlmroberta':
+            outputs = self.bert(
+                doc_input_ids,
+                attention_mask=doc_attention_mask,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
+        elif self.args.model_type == 'bert':
+            outputs = self.bert(
+                doc_input_ids,
+                attention_mask=doc_attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
 
         pooled_output = outputs[1]
 

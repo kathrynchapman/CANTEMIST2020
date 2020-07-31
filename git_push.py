@@ -1,15 +1,19 @@
 import os
 
 cmd = 'git add .'
-os.popen(cmd).read()
+temp = os.popen(cmd).read()
+print(temp)
 cmd = 'git status'
-os.popen(cmd).read()
+temp = os.popen(cmd).read()
+print(temp)
 inp = input("Message? Hit enter for simple 'bug fixes'\n\t")
 if inp:
     message = inp
 else:
     message = 'bug fixes'
 cmd = 'git commit -m "{}"'.format(message)
-os.popen(cmd).read()
+temp = os.popen(cmd).read()
+print(temp)
 cmd = 'git push origin master'
-os.popen(cmd).read()
+temp = os.popen(cmd).read()
+print(temp)
