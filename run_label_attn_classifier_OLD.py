@@ -278,7 +278,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
 
 
 MODEL_CLASSES = {
-    "xlmroberta": (XLMRobertaConfig, XLMRobertaForSequenceClassification, XLMRobertaTokenizer),
+    "xlmroberta": (XLMRobertaConfig, BertForMLSCWithLabelAttention, XLMRobertaTokenizer),
     "bert": (BertConfig, BertForMLSCWithLabelAttention, BertTokenizer),
     # "experiemnt": (BertConfig, LabelAttentionNetwork, BertTokenizer)
 }
