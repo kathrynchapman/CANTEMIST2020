@@ -89,6 +89,183 @@ def acc_and_f1(preds, labels):
     }
 
 
+class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
+    def __init__(self, config, args='', loss_fct='', class_weights=None):
+        super().__init__(config)
+        self.args = args
+        if self.args.model_type == 'bert':
+            self.bert = BertModel(config)
+        elif self.args.model_type == 'xlmroberta':
+            self.roberta = XLMRobertaModel(config)
+        self.num_labels = args.num_labels
+        if not class_weights:
+            self.class_weights = torch.ones((self.num_labels,))
+        else:
+            self.class_weights = class_weights
+        self.iteration = 1
+        self.loss_fct = loss_fct
+        self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
+
+        self.init_weights()
+
+    # @add_start_docstrings_to_callable(BERT_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
+    def forward(
+            self,
+            doc_input_ids=None,
+            doc_attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            labels=None,
+            ranks=None,
+            output_attentions=None,
+    ):
+        r"""
+        labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
+            Labels for computing the sequence classification/regression loss.
+            Indices should be in :obj:`[0, ..., config.num_labels - 1]`.
+            If :obj:`config.num_labels == 1` a regression loss is computed (Mean-Square loss),
+            If :obj:`config.num_labels > 1` a classification loss is computed (Cross-Entropy).
+    Returns:
+        :obj:`tuple(torch.FloatTensor)` comprising various elements depending on the configuration (:class:`~transformers.BertConfig`) and inputs:
+        loss (:obj:`torch.FloatTensor` of shape :obj:`(1,)`, `optional`, returned when :obj:`label` is provided):
+            Classification (or regression if config.num_labels==1) loss.
+        logits (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, config.num_labels)`):
+            Classification (or regression if config.num_labels==1) scores (before SoftMax).
+        hidden_states (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``config.output_hidden_states=True``):
+            Tuple of :obj:`torch.FloatTensor` (one for the output of the embeddings + one for the output of each layer)
+            of shape :obj:`(batch_size, sequence_length, hidden_size)`.
+            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+        attentions (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``output_attentions=True`` is passed or ``config.output_attentions=True``):
+            Tuple of :obj:`torch.FloatTensor` (one for each layer) of shape
+            :obj:`(batch_size, num_heads, sequence_length, sequence_length)`.
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    Examples::
+        from transformers import BertTokenizer, BertForSequenceClassification
+        import torch
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+        input_ids = torch.tensor(tokenizer.encode("Hello, my dog is cute", add_special_tokens=True)).unsqueeze(0)  # Batch size 1
+        labels = torch.tensor([1]).unsqueeze(0)  # Batch size 1
+        outputs = model(input_ids, labels=labels)
+        loss, logits = outputs[:2]
+        """
+        if self.args.model_type == 'xlmroberta':
+            outputs = self.roberta(
+                doc_input_ids,
+                attention_mask=doc_attention_mask,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
+        elif self.args.model_type == 'bert':
+            outputs = self.bert(
+                doc_input_ids,
+                attention_mask=doc_attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                # output_attentions=output_attentions,
+            )
+
+        pooled_output = outputs[1]
+
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+
+        logits = logits.view(-1, self.num_labels)
+
+        if self.args.doc_batching:
+            if self.args.logit_aggregation == 'max':
+                logits = torch.max(logits, axis=0)[0]
+            elif self.args.logit_aggregation == 'avg':
+                logits = torch.mean(logits, axis=0)
+
+
+        # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
+        # temp = torch.mean(torch.abs(logits.view(-1, self.num_labels)-labels.view(-1, self.num_labels)).float()+1, axis=0)
+
+        outputs = (logits,) + outputs[2:]  # add hidden states and attention if they are here
+
+        # #############
+        # # get the sequence-level document representations
+        # doc_seq_output = doc_outputs[0]
+        # # print("DOC SEQ OUTPUT SHAPE:", doc_seq_output.shape)
+        # batch_size = doc_seq_output.shape[0]
+        # # print("BATCH SIZE:", batch_size)
+        #
+        # # get the sequence-level label description representations
+        # label_seq_output = label_outputs[0]
+        #
+        # label_seq_output = label_seq_output.reshape(self.num_labels * self.args.label_max_seq_length, self.hidden_size)
+        # temp = torch.matmul(doc_seq_output, label_seq_output.T)
+        # temp = temp.permute(0, 2, 1)
+        #
+        # temp = self.w1(temp)
+        #
+        # temp = temp.reshape(batch_size, self.num_labels, self.args.label_max_seq_length)
+        #
+        # temp = self.w2(temp)
+        #
+        # logits = temp.view(-1, self.num_labels)
+        #
+        # ############
+        if labels is not None:
+            if self.args.do_iterative_class_weights:
+                # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
+                temp = logits.detach()
+                temp = torch.nn.Sigmoid()(temp)
+                temp = (temp > self.args.prediction_threshold).float()
+                temp = torch.mean(
+                    torch.abs(temp.view(-1, self.num_labels) - labels.view(-1, self.num_labels)).float() + 1, axis=0)
+                try:
+                    self.class_weights = torch.Tensor(self.class_weights).cuda()
+                except:
+                    pass
+                self.class_weights *= self.iteration
+                self.class_weights += temp
+                self.class_weights /= (self.iteration + 1)
+                class_weights = self.class_weights.detach()
+            elif self.args.do_normal_class_weights:
+                class_weights = torch.Tensor(self.class_weights).cuda()
+            else:
+                class_weights = None
+            labels = labels.float()
+
+            if self.loss_fct == 'bce':
+                loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
+            elif self.loss_fct == 'bbce':
+                loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True, weights=class_weights)
+            elif self.loss_fct == 'cel':
+                loss_fct = CrossEntropyLoss()
+
+            if self.loss_fct != 'none':
+                if self.args.do_experimental_ranks_instead_of_labels:
+                    loss = loss_fct(logits.view(-1, self.num_labels), ranks.float().view(-1, self.num_labels))
+                else:
+                    loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1,self.num_labels))
+            else:
+                loss = 0
+
+            if self.args.do_ranking_loss or self.args.do_weighted_ranking_loss:
+                if not self.args.do_weighted_ranking_loss:
+                    loss_fct = RankingLoss(self.args.doc_batching, weights=None)
+                else:
+                    loss_fct = RankingLoss(self.args.doc_batching, weights=class_weights)
+                loss += loss_fct(logits, ranks)
+            outputs = (loss,) + outputs
+
+
+
+            # loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+            # outputs = (loss,) + outputs
+        self.iteration += 1
+        return outputs  # (loss), logits, (hidden_states), (attentions)
 
 class BertForMLSCWithLabelAttention(BertPreTrainedModel):
     def __init__(self, config, args='', loss_fct='', class_weights=None):
@@ -289,165 +466,6 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         self.iteration += 1
         return outputs  # (loss), logits, (hidden_states), (attentions)
 
-class BertForMLSCWithLabelAttention(BertPreTrainedModel):
-    def __init__(self, config, args='', loss_fct='', class_weights=None):
-        super().__init__(config)
-        self.args = args
-        if self.args.model_type == 'bert':
-            self.bert = BertModel(config)
-        elif self.args.model_type == 'xlmroberta':
-            self.roberta = XLMRobertaModel(config)
-        self.num_labels = args.num_labels
-        self.label_data = ''
-
-        self.loss_fct = loss_fct
-        self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
-
-        self.w1 = torch.nn.Linear(args.doc_max_seq_length, 1)
-        self.w2 = torch.nn.Linear(args.label_max_seq_length, 1)
-
-        self.hidden_size = config.hidden_size
-        self.init_weights()
-
-    def initialize_label_data(self, label_data):
-        self.label_data = label_data
-
-    # @add_start_docstrings_to_callable(BERT_INPUTS_DOCSTRING.format("(batch_size, sequence_length)"))
-    def forward(
-            self,
-            doc_input_ids=None,
-            doc_attention_mask=None,
-            label_desc_input_ids=None,
-            label_desc_attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            labels=None,
-            ranks=None,
-            output_attentions=None,
-    ):
-        r"""
-        labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
-            Labels for computing the sequence classification/regression loss.
-            Indices should be in :obj:`[0, ..., config.num_labels - 1]`.
-            If :obj:`config.num_labels == 1` a regression loss is computed (Mean-Square loss),
-            If :obj:`config.num_labels > 1` a classification loss is computed (Cross-Entropy).
-    Returns:
-        :obj:`tuple(torch.FloatTensor)` comprising various elements depending on the configuration (:class:`~transformers.BertConfig`) and inputs:
-        loss (:obj:`torch.FloatTensor` of shape :obj:`(1,)`, `optional`, returned when :obj:`label` is provided):
-            Classification (or regression if config.num_labels==1) loss.
-        logits (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, config.num_labels)`):
-            Classification (or regression if config.num_labels==1) scores (before SoftMax).
-        hidden_states (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``config.output_hidden_states=True``):
-            Tuple of :obj:`torch.FloatTensor` (one for the output of the embeddings + one for the output of each layer)
-            of shape :obj:`(batch_size, sequence_length, hidden_size)`.
-            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        attentions (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``output_attentions=True`` is passed or ``config.output_attentions=True``):
-            Tuple of :obj:`torch.FloatTensor` (one for each layer) of shape
-            :obj:`(batch_size, num_heads, sequence_length, sequence_length)`.
-            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
-            heads.
-    Examples::
-        from transformers import BertTokenizer, BertForSequenceClassification
-        import torch
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
-        input_ids = torch.tensor(tokenizer.encode("Hello, my dog is cute", add_special_tokens=True)).unsqueeze(0)  # Batch size 1
-        labels = torch.tensor([1]).unsqueeze(0)  # Batch size 1
-        outputs = model(input_ids, labels=labels)
-        loss, logits = outputs[:2]
-        """
-
-
-        if self.args.model_type == 'xlmroberta':
-            doc_outputs = self.roberta(
-                doc_input_ids,
-                attention_mask=doc_attention_mask,
-                token_type_ids=token_type_ids,
-                position_ids=position_ids,
-                head_mask=head_mask,
-                inputs_embeds=inputs_embeds,
-                # output_attentions=output_attentions,
-            )
-
-            label_outputs = self.roberta(
-                self.label_data[0].cuda(),
-                attention_mask=self.label_data[1].cuda(),
-                # token_type_ids=token_type_ids,
-                # position_ids=position_ids,
-                # head_mask=head_mask,
-                # inputs_embeds=inputs_embeds,
-                # output_attentions=output_attentions,
-            )
-        elif self.args.model_type == 'bert':
-            doc_outputs = self.bert(
-                doc_input_ids,
-                attention_mask=doc_attention_mask,
-                token_type_ids=token_type_ids,
-                position_ids=position_ids,
-                head_mask=head_mask,
-                inputs_embeds=inputs_embeds,
-                # output_attentions=output_attentions,
-            )
-
-            label_outputs = self.bert(
-                self.label_data[0].cuda(),
-                attention_mask=self.label_data[1].cuda(),
-                token_type_ids=self.label_data[-1].cuda(),
-                # position_ids=position_ids,
-                # head_mask=head_mask,
-                # inputs_embeds=inputs_embeds,
-                # output_attentions=output_attentions,
-            )
-
-        # get the sequence-level document representations
-        doc_seq_output = doc_outputs[0]
-
-        batch_size = doc_seq_output.shape[0]
-
-        # get the sequence-level label description representations
-        label_seq_output = label_outputs[0]
-
-        label_seq_output = label_seq_output.reshape(self.num_labels * self.args.label_max_seq_length, self.hidden_size)
-        temp = torch.matmul(doc_seq_output, label_seq_output.T)
-        temp = temp.permute(0, 2, 1)
-
-        temp = self.w1(temp)
-
-        temp = temp.reshape(batch_size, self.num_labels, self.args.label_max_seq_length)
-
-        temp = self.w2(temp)
-
-        logits = temp.view(-1, self.num_labels)
-
-        if self.args.doc_batching:
-
-            logits = torch.max(logits, axis=0)[0]
-
-
-        # print("logits.shape:", logits.shape)
-
-        outputs = (logits,)  # + outputs[2:]  # add hidden states and attention if they are here
-
-        if labels is not None:
-
-
-            labels = labels.float()
-
-            if self.loss_fct == 'bce':
-                loss_fct = BCEWithLogitsLoss()
-            elif self.loss_fct == 'bbce':
-                loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True)
-
-            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
-            outputs = (loss,) + outputs
-
-            # loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-            # outputs = (loss,) + outputs
-
-
-        return outputs  # (loss), logits, (hidden_states), (attentions)
 
 
 MODEL_CLASSES = {
