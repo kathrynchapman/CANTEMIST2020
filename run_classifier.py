@@ -341,7 +341,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         loss, logits = outputs[:2]
         """
 
-        print("doc_input_ids.shape".upper(), doc_input_ids.shape)
+
         if self.args.model_type == 'xlmroberta':
             doc_outputs = self.roberta(
                 doc_input_ids,
@@ -411,6 +411,8 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
                 # print("logits.shape:", logits.shape)
         # pooled_output = self.dropout(pooled_output)
         # logits = self.classifier(pooled_output)
+
+        print("logits.shape".upper(), logits.shape)
 
         outputs = (logits,)  # + outputs[2:]  # add hidden states and attention if they are here
 
