@@ -385,9 +385,8 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
 
         # get the sequence-level document representations
         doc_seq_output = doc_outputs[0]
-        # print("DOC SEQ OUTPUT SHAPE:", doc_seq_output.shape)
+
         batch_size = doc_seq_output.shape[0]
-        # print("BATCH SIZE:", batch_size)
 
         # get the sequence-level label description representations
         label_seq_output = label_outputs[0]

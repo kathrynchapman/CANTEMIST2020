@@ -127,9 +127,6 @@ class BalancedBCEWithLogitsLoss(nn.Module):
         else:
             weighted_loss = False
 
-
-
-
         # number of classes
         nc = labels.shape[1]
 

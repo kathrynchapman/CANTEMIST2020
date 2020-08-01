@@ -107,7 +107,7 @@ def fill_dict(exp_dict):
         exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['Entry Date'] = dt_string
 
         if notes or add_to_notes:
-            exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]]['Notes'] = notes + add_to_notes
+            exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['Notes'] = notes + add_to_notes
 
         save(exp_dict, 'exp_dict.p')
         done = True if input("Do you have another experiment to enter? [y, n]: ") == 'n' else False
@@ -286,6 +286,7 @@ if __name__ == '__main__':
             partial(defaultdict,
             partial(defaultdict,
             partial(defaultdict, str))))))))
+
 
 
     finished = False
