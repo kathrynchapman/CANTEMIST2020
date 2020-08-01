@@ -538,12 +538,12 @@ def evaluate(args, model, tokenizer, prefix=""):
 
             #############################
             if args.doc_batching:
-                labels = batch[3]
-                ranks = batch[-1]
+                labels = batch[3][0]
+                ranks = batch[-1][0]
             else:
-                labels = batch[3]
-                ranks = batch[-1]
-            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": labels, "ranks": ranks}
+                labels = batch[3][0]
+                ranks = batch[-1][0]
+            inputs = {"doc_input_ids": batch[0][0], "doc_attention_mask": batch[1][0], "labels": labels, "ranks": ranks}
 
             #############################
             # if args.doc_batching:
