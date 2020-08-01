@@ -92,9 +92,9 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         super().__init__(config)
         self.num_labels = args.num_labels
         if args.model_type=='bert':
-	        self.bert = BertModel(config)
-	    else:
-	    	self.roberta = XLMRobertaModel(config)
+            self.bert = BertModel(config)
+        else:
+            self.roberta = XLMRobertaModel(config)
         self.label_data = ''
         self.class_weights = torch.ones((self.num_labels,))
         self.iteration = 1
