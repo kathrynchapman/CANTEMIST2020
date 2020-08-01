@@ -160,18 +160,18 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         """
 
         # print("doc_input_ids.shape".upper(), doc_input_ids.shape)
-		if args.model_type=='bert':
-        	doc_outputs = self.bert(
-            	doc_input_ids,
-            	attention_mask=doc_attention_mask,
-            	token_type_ids=token_type_ids,
-            	position_ids=position_ids,
-            	head_mask=head_mask,
-            	inputs_embeds=inputs_embeds,
+        if self.args.model_type=='bert':
+            doc_outputs = self.bert(
+                doc_input_ids,
+                attention_mask=doc_attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
             	# output_attentions=output_attentions,
         	)
 
-	        label_outputs = self.bert(
+            label_outputs = self.bert(
 	            self.label_data[0].cuda(),
     	        attention_mask=self.label_data[1].cuda(),
         	    # token_type_ids=token_type_ids,
@@ -180,9 +180,9 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
     	        # inputs_embeds=inputs_embeds,
         	    # output_attentions=output_attentions,
 	        )
-	    else:
-	        doc_outputs = self.roberta(
-            	doc_input_ids,
+        else:
+            doc_outputs = self.roberta(
+                doc_input_ids,
             	attention_mask=doc_attention_mask,
             	token_type_ids=token_type_ids,
             	position_ids=position_ids,
@@ -191,7 +191,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
             	# output_attentions=output_attentions,
         	)
 
-	        label_outputs = self.roberta(
+            label_outputs = self.roberta(
 	            self.label_data[0].cuda(),
     	        attention_mask=self.label_data[1].cuda(),
         	    # token_type_ids=token_type_ids,
