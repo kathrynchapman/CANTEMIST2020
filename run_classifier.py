@@ -915,7 +915,7 @@ def evaluate(args, model, tokenizer, prefix=""):
             if args.model_type == 'bert':
                 inputs['token_type_ids'] = batch[-1]
 
-            for key, value in inputs:
+            for key, value in inputs.items():
                 print(key, type(value))
                 try:
                     print(value.shape)
