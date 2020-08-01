@@ -603,7 +603,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
             logits = torch.max(logits, axis=0)[0]
 
 
-        print("logits.shape:", logits.shape)
+        # print("logits.shape:", logits.shape)
 
         outputs = (logits,)  # + outputs[2:]  # add hidden states and attention if they are here
 
