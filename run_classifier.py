@@ -341,7 +341,7 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
         loss, logits = outputs[:2]
         """
 
-        # print("doc_input_ids.shape".upper(), doc_input_ids.shape)
+        print("doc_input_ids.shape".upper(), doc_input_ids.shape)
         if self.args.model_type == 'xlmroberta':
             doc_outputs = self.roberta(
                 doc_input_ids,
