@@ -913,14 +913,14 @@ def evaluate(args, model, tokenizer, prefix=""):
                 ranks = batch[4]
             inputs = {"doc_input_ids": input_ids, "doc_attention_mask": attn_mask, "labels": labels, "ranks": ranks}
             if args.model_type == 'bert':
-                inputs['token_type_ids'] = batch[-1]
+                inputs['token_type_ids'] = batch[-1][0]
 
-            for key, value in inputs.items():
-                print(key, type(value))
-                try:
-                    print(value.shape)
-                except:
-                    continue
+            # for key, value in inputs.items():
+            #     print(key, type(value))
+            #     try:
+            #         print(value.shape)
+            #     except:
+            #         continue
 
             # inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[2], "ranks": batch[4]}
             # if args.model_type == 'bert':
