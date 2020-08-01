@@ -266,8 +266,12 @@ def convert_examples_to_features(
 
         except:
             print(example)
-        input_ids, token_type_ids = [inputs["input_ids"] for inputs in batch], [inputs["token_type_ids"] for inputs in
-                                                                                batch]
+        try:
+            input_ids, token_type_ids = [inputs["input_ids"] for inputs in batch], [inputs["token_type_ids"] for inputs in
+                                                                                    batch]
+        except:
+            input_ids, token_type_ids = [inputs["input_ids"] for inputs in batch], [[] for inputs in
+                                                                                    batch]
         # input_ids = [[101, 17160, 10124, 169, 102], [101, 16138, 10454, 11940, 102],
         #               [101, 10142, 11152, 81130, 102], [101, 11127, 106, 102]]
 
