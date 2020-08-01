@@ -416,7 +416,6 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
 
         if labels is not None:
             # labels = labels[0,:]
-
             if self.args.do_iterative_class_weights:
                 # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
                 temp = logits.detach()
@@ -821,8 +820,12 @@ def evaluate(args, model, tokenizer, prefix=""):
 
     eval_loss = eval_loss / nb_eval_steps
 
+    print("preds.shape".upper(), preds.shape)
     preds = preds.reshape((len(eval_dataset), args.num_labels))
+    print("preds.shape".upper(), preds.shape)
+    print("out_label_ids.shape".upper(), out_label_ids.shape)
     out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
+    print("out_label_ids.shape".upper(), out_label_ids.shape)
 
     preds = sigmoid(preds)
 
