@@ -901,24 +901,30 @@ def evaluate(args, model, tokenizer, prefix=""):
         with torch.no_grad():
 
             ##############################
-            # if args.doc_batching:
-            #     input_ids = batch[0][0]
-            #     attn_mask = batch[1][0]
-            #     labels = batch[2][0]
-            #     ranks = batch[4][0]
-            # else:
-            #     input_ids = batch[0]  # may need to fix this!
-            #     attn_mask = batch[1]  # may need to fix this!
-            #     labels = batch[2]
-            #     ranks = batch[4]
-            # inputs = {"doc_input_ids": input_ids, "doc_attention_mask": attn_mask, "labels": labels, "ranks": ranks}
-            # if args.model_type == 'bert':
-            #     inputs['token_type_ids'] = batch[-1]
-
-
-            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[2], "ranks": batch[4]}
+            if args.doc_batching:
+                input_ids = batch[0][0]
+                attn_mask = batch[1][0]
+                labels = batch[2][0]
+                ranks = batch[4][0]
+            else:
+                input_ids = batch[0]  # may need to fix this!
+                attn_mask = batch[1]  # may need to fix this!
+                labels = batch[2]
+                ranks = batch[4]
+            inputs = {"doc_input_ids": input_ids, "doc_attention_mask": attn_mask, "labels": labels, "ranks": ranks}
             if args.model_type == 'bert':
                 inputs['token_type_ids'] = batch[-1]
+
+            for key, value in inputs:
+                print(key, type(value))
+                try:
+                    print(value.shape)
+                except:
+                    continue
+
+            # inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[2], "ranks": batch[4]}
+            # if args.model_type == 'bert':
+            #     inputs['token_type_ids'] = batch[-1]
 
 
             #############################
