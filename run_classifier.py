@@ -820,21 +820,23 @@ def evaluate(args, model, tokenizer, prefix=""):
 
     eval_loss = eval_loss / nb_eval_steps
 
-    print("preds.shape".upper(), preds.shape)
-    preds = preds.reshape((len(eval_dataset), args.num_labels))
-    print("preds.shape".upper(), preds.shape)
-    print("out_label_ids.shape".upper(), out_label_ids.shape)
-    out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
-    print("out_label_ids.shape".upper(), out_label_ids.shape)
 
+    preds = preds.reshape((len(eval_dataset), args.num_labels))
+
+    out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
+
+    print(preds[0])
     preds = sigmoid(preds)
 
     # preds = (preds > args.prediction_threshold).astype(int)
 
+    print(preds[0])
+
     preds[preds < args.prediction_threshold] = 0
+    print(preds[0])
     sorted_preds_idx = np.flip(np.argsort(preds))
     preds = (preds > args.prediction_threshold)
-
+    print(preds[0])
     assert preds.shape == out_label_ids.shape
 
     result = acc_and_f1(preds, out_label_ids)
