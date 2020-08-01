@@ -1214,7 +1214,7 @@ def main():
     )
     parser.add_argument(
         "--label_max_seq_length",
-        default=10,
+        default=15,
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
              "than this will be truncated, sequences shorter will be padded.",
