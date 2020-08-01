@@ -108,24 +108,24 @@ class BalancedBCEWithLogitsLoss(nn.Module):
         # labels must be a binary valued tensor
         assert logits.shape == labels.shape, "logits shape %r != labels shape %r" % (logits.shape, labels.shape)
 
-        if self.weights is not None:
-            # then we have class weights to make use of
-            s_logits = torch.nn.Sigmoid()(logits)
-            log_s_logits = torch.log(s_logits)
-            weighted_targets = self.weights * labels
-
-
-            one_minus_targets = 1 - labels
-            log_one_minus_s_logits = torch.log(1-s_logits)
-
-            # weighted_loss = torch.matmul(weighted_targets, log_s_logits) + torch.matmul(one_minus_targets, log_one_minus_s_logits)
-            weighted_loss = -((weighted_targets * log_s_logits) + (one_minus_targets * log_one_minus_s_logits))
-
-            assert weighted_loss.shape == logits.shape
-            weighted_loss = weighted_loss.mean()
-
-        else:
-            weighted_loss = False
+        # if self.weights is not None:
+        #     # then we have class weights to make use of
+        #     s_logits = torch.nn.Sigmoid()(logits)
+        #     log_s_logits = torch.log(s_logits)
+        #     weighted_targets = self.weights * labels
+        #
+        #
+        #     one_minus_targets = 1 - labels
+        #     log_one_minus_s_logits = torch.log(1-s_logits)
+        #
+        #     # weighted_loss = torch.matmul(weighted_targets, log_s_logits) + torch.matmul(one_minus_targets, log_one_minus_s_logits)
+        #     weighted_loss = -((weighted_targets * log_s_logits) + (one_minus_targets * log_one_minus_s_logits))
+        #
+        #     assert weighted_loss.shape == logits.shape
+        #     weighted_loss = weighted_loss.mean()
+        #
+        # else:
+        #     weighted_loss = False
 
         # number of classes
         nc = labels.shape[1]
@@ -150,10 +150,10 @@ class BalancedBCEWithLogitsLoss(nn.Module):
         loss = -(torch.log(proba) * pos_weight + torch.log(1. - proba) * (1. - labels))
         # the labels which are supposed to be positive get more weight added to them
         loss = loss.mean()
-        if weighted_loss and self.reduction == 'mean':
-            loss = (loss + weighted_loss)/2
-        elif weighted_loss and self.reduction == 'sum':
-            loss += weighted_loss
+        # if weighted_loss and self.reduction == 'mean':
+        #     loss = (loss + weighted_loss)/2
+        # elif weighted_loss and self.reduction == 'sum':
+        #     loss += weighted_loss
 
         
         return loss
