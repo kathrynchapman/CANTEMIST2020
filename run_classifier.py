@@ -925,7 +925,7 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
                 input_ids = batch[0]  # may need to fix this!
                 attn_mask = batch[1]  # may need to fix this!
 
-            inputs = {"doc_input_ids": input_ids, "doc_attention_mask": attn_mask, "labels": None, "ranks": ranks}
+            inputs = {"doc_input_ids": input_ids, "doc_attention_mask": attn_mask, "labels": None, "ranks": None}
             if args.model_type == 'bert':
                 inputs['token_type_ids'] = batch[-1][0] # prolly gonna need to fix this
 
