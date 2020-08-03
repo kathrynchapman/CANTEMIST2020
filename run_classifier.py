@@ -799,20 +799,13 @@ def evaluate(args, model, tokenizer, prefix=""):
                     ids[0], batch[3].detach().cpu().numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
-
-    print(preds.tolist())
-    print(preds.shape)
     preds = preds.reshape((len(eval_dataset), args.num_labels))
-    print(preds[-1,:])
+
 
     out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
 
 
-    preds = sigmoid(preds)
-
-
-    # preds = (preds > args.prediction_threshold).astype(int)
-
+    preds = torch.nn.Sigmoid()(preds)
 
 
     preds[preds < args.prediction_threshold] = 0
