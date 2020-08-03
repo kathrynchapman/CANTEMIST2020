@@ -4,6 +4,7 @@ from functools import partial
 import pandas as pd
 from beautifultable import BeautifulTable
 from datetime import datetime
+import argparse
 
 models = ['baseline', 'label_attention']
 bert_flavors = ['ml_bert', 'xlmr', 'fp-xlmr']
@@ -276,8 +277,17 @@ def show_remaining_exps(exp_dict):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--dict_name",
+        default='exp_dict.p',
+        type=str,
+        help="Name of the dictionary file to load/use",
+    )
+    args = parser.parse_args()
+
     try:
-        exp_dict = load('exp_dict.p')
+        exp_dict = load(args.dict_name)
     except:
         exp_dict = defaultdict(
             partial(defaultdict,

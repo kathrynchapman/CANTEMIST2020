@@ -760,6 +760,9 @@ def evaluate(args, model, tokenizer, prefix=""):
             if args.model_type == 'bert':
                 inputs['token_type_ids'] = batch[-1][0] # prolly gonna need to fix this
 
+            print(inputs)
+            sys.exit()
+
 
 
             #############################
