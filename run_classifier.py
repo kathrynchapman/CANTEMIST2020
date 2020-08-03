@@ -508,6 +508,8 @@ def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
     #     # print(d[1].shape)
     #     print("*"*100)
 
+    sys.exit()
+
     if args.max_steps > 0:
         t_total = args.max_steps
         args.num_train_epochs = args.max_steps // (len(train_dataloader) // args.gradient_accumulation_steps) + 1
@@ -616,6 +618,7 @@ def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
                 batch = tuple(t.to(args.device) for t in batch)
 
             inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[2], "ranks": batch[4]}
+            print(inputs)
             if args.model_type == 'bert':
                 inputs['token_type_ids'] = batch[-1]
 
@@ -1246,14 +1249,15 @@ def main():
         do_lower_case=args.do_lower_case,
         cache_dir=args.cache_dir if args.cache_dir else None,
     )
-    model = model_class.from_pretrained(
-        args.model_name_or_path,
-        from_tf=bool(".ckpt" in args.model_name_or_path),
-        config=config,
-        loss_fct=args.loss_fct,
-        args=args,
-        class_weights=class_weights,
-    )
+    # model = model_class.from_pretrained(
+    #     args.model_name_or_path,
+    #     from_tf=bool(".ckpt" in args.model_name_or_path),
+    #     config=config,
+    #     loss_fct=args.loss_fct,
+    #     args=args,
+    #     class_weights=class_weights,
+    # )
+
 
     # model = model_class()
 
@@ -1264,7 +1268,8 @@ def main():
     if args.local_rank == 0:
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
 
-    model.to(args.device)
+    model = None
+    # model.to(args.device)
 
     logger.info("Training/evaluation parameters %s", args)
 

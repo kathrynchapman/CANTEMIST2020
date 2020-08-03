@@ -106,7 +106,7 @@ class MyProcessor(DataProcessor):
         self.train_file = os.path.join(args.data_dir,
                                        'train_{}_{}.p'.format(args.label_threshold, args.train_on_all))
         self.dev_file = os.path.join(args.data_dir,
-                                     'dev_{}_{}.p'.format(args.label_threshold, args.ignore_labeltrain_on_allless_docs))
+                                     'dev_{}_{}.p'.format(args.label_threshold, args.train_on_all))
         self.test_file = os.path.join(args.data_dir,
                                       'test_{}_{}.p'.format(args.label_threshold, args.train_on_all))
         self.label_desc_file = os.path.join(args.data_dir, "label_desc_{}.p".format(str(args.label_threshold)))
@@ -464,6 +464,11 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
         all_labels = [torch.tensor(f.label_ids, dtype=torch.long) for f in doc_features]
         all_doc_ids = [torch.tensor(f.guid, dtype=torch.long) for f in doc_features]
         all_label_ranks = [torch.tensor(f.label_ranks, dtype=torch.long) for f in doc_features]
+
+        # the above all all lists of tensors, each item in the list corresponding to different examples
+        # due to the document batching and varying document sizes, these must be in a list and not a large tensor
+
+
         if not args.model_type == 'xlmroberta':
             all_token_type_ids = [torch.tensor(f.segment_ids, dtype=torch.long) for f in doc_features]
             doc_dataset = BatchedDataset([all_input_ids, all_attention_mask, all_labels,

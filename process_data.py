@@ -10,6 +10,8 @@ import argparse
 import itertools
 import numpy as np
 from sklearn.preprocessing import normalize
+from utils import *
+from transformers import XLMRobertaTokenizer
 
 random.seed(30)
 cantemist_path = "cantemist/"
@@ -98,7 +100,7 @@ class CantemistReader():
                     if label == '90800/1':
                         label = '9080/1'
                     self.label_dict[doc_id].append(label)
-                    if train == True:
+                    if train == True or self.args.train_on_all:
                         self.class_weight_dict[label] += 1
                     if doc_id not in id_list:
                         id_list.append(doc_id)
@@ -320,7 +322,11 @@ class CantemistReader():
             self.write_files()
         else:
             self.construct_label_desc_dict()
-        for data_type in [self.train_file, self.dev_file, self.test_file]:
+        if self.args.train_on_all:
+            to_iterate = [self.train_file, self.test_file]
+        else:
+            to_iterate = [self.train_file, self.dev_file, self.test_file]
+        for data_type in to_iterate:
             file_path = 'processed_data/cantemist/{}.tsv'.format(data_type)
             data = pd.read_csv(file_path, sep='\t', skip_blank_lines=True)
             if data_type == self.test_file:
@@ -332,6 +338,8 @@ class CantemistReader():
                 labels_binarized = self.mlb.fit_transform(labels)
             else:
                 labels_binarized = self.mlb.transform(labels)
+            # elif self.args.train_on_all==True:
+            #     labels_binarized = self.mlb.fit_transform(labels)
 
             labels_ranked = labels_binarized.copy()
 
@@ -341,43 +349,48 @@ class CantemistReader():
                     l_bin[idx] = len(l_str) - rank
 
 
+
             if data_type == self.test_file:
                 data = [(data.iloc[idx, 0], data.iloc[idx, 1], None, None) for idx in range(len(data))]
             else:
                 data = [(data.iloc[idx, 0], data.iloc[idx, 1], labels_binarized[idx, :], labels_ranked[idx,:]) for idx in range(len(data))]
             save('processed_data/cantemist/{}.p'.format(data_type), data)
             if not os.path.exists('processed_data/cantemist/mlb_{}_{}.p'.format(self.args.label_threshold,
-                                                                                self.args.train_on_all)):
+                                                                                self.args.train_on_all)) and data_type == self.train_file:
                 save('processed_data/cantemist/mlb_{}_{}.p'.format(self.args.label_threshold,
                                                                    self.args.train_on_all),
                      self.mlb)
 
+                # get class weights
+                total_train_docs = len(self.train_ids)
+                self.class_weight_dict = {k: (total_train_docs - v) / v for k, v in self.class_weight_dict.items()}
+                # and make sure they're in order according to the binarized labels....
+                class_weights = [(k, v) for k, v in self.class_weight_dict.items() if k in set(self.mlb.classes_)]
+                class_weights = sorted(class_weights, key=lambda x: list(self.mlb.classes_).index(x[0]))
 
-        # get the label descriptions to save and make sure they're in the same order as the binarized labels
-        label_descs_to_save = [(k, v) for k, v in self.label_desc_dict.items() if k in set(self.mlb.classes_)]
+                assert list(self.mlb.classes_) == [k for k, v in class_weights], print("Sorry, label order mismatch")
+                # we only want the numbers now, not the codes themselves....
+                class_weights = [v for c, v in class_weights]
 
-        label_descs_to_save = sorted(label_descs_to_save, key=lambda x: list(self.mlb.classes_).index(x[0]))
+                if not os.path.exists(
+                        'processed_data/cantemist/class_weights_{}_{}.p'.format(str(len(self.class_weight_dict)),
+                                                                                self.train_on_all)):
+                    save('processed_data/cantemist/class_weights_{}_{}.p'.format(str(len(self.mlb.classes_)),
+                                                                                 self.train_on_all),
+                         class_weights)
 
-        assert list(self.mlb.classes_) == [k for k, v in label_descs_to_save], print("Sorry, label order mismatch")
 
-        if not os.path.exists('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold)):
-            save('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold),
-                 label_descs_to_save)
+                # get the label descriptions to save and make sure they're in the same order as the binarized labels
+                label_descs_to_save = [(k, v) for k, v in self.label_desc_dict.items() if k in set(self.mlb.classes_)]
 
-        # get class weights
-        total_train_docs = len(self.train_ids)
-        self.class_weight_dict = {k: (total_train_docs-v) / v for k, v in self.class_weight_dict.items()}
-        # and make sure they're in order according to the binarized labels....
-        class_weights = [(k, v) for k, v in self.class_weight_dict.items() if k in set(self.mlb.classes_)]
-        class_weights = sorted(class_weights, key=lambda x: list(self.mlb.classes_).index(x[0]))
+                label_descs_to_save = sorted(label_descs_to_save, key=lambda x: list(self.mlb.classes_).index(x[0]))
 
-        assert list(self.mlb.classes_) == [k for k, v in class_weights], print("Sorry, label order mismatch")
-        # we only want the numbers now, not the codes themselves....
-        class_weights = [v for c, v in class_weights]
+                assert list(self.mlb.classes_) == [k for k, v in label_descs_to_save], print("Sorry, label order mismatch")
 
-        if not os.path.exists('processed_data/cantemist/class_weights_{}_{}.p'.format(str(len(self.class_weight_dict)), self.train_on_all)):
-            save('processed_data/cantemist/class_weights_{}_{}.p'.format(str(len(self.mlb.classes_)), self.train_on_all),
-                 class_weights)
+                if not os.path.exists('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold)):
+                    save('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold),
+                         label_descs_to_save)
+
 
 
 if __name__ == '__main__':
@@ -392,29 +405,170 @@ if __name__ == '__main__':
                         help="Whether to ignore documents with no labels.")
     parser.add_argument('--preprocess', action='store_true', help="Whether to redo all of the pre-processing.")
     parser.add_argument('--make_plots', action='store_true', help="Whether to make plots on data.")
+    parser.add_argument('--train_on_all', action='store_true')
+    parser.add_argument('--data_dir', default='processed_data/cantemist/')
+    parser.add_argument('--local_rank', default=-1)
+    parser.add_argument('--model_name_or_path', type=str, default='xlm-roberta-base')
+    parser.add_argument('--doc_max_seq_length', default=256)
+
+    parser.add_argument(
+        "--model_type",
+        default='xlmroberta',
+        type=str,
+    )
+
+
+    parser.add_argument(
+        "--output_dir",
+        default=None,
+        type=str,
+        help="The output directory where the model predictions and checkpoints will be written.",
+    )
+
+    # Other parameters
+    parser.add_argument(
+        "--prediction_threshold",
+        default=0.5,
+        type=float,
+        help="Threshold at which to decide between 0 and 1 for labels.",
+    )
+    parser.add_argument(
+        "--loss_fct", default="none", type=str, help="The function to use.",
+    )
+    parser.add_argument(
+        "--config_name", default="", type=str, help="Pretrained config name or path if not the same as model_name",
+    )
+    parser.add_argument(
+        "--tokenizer_name",
+        default="",
+        type=str,
+        help="Pretrained tokenizer name or path if not the same as model_name",
+    )
+    parser.add_argument(
+        "--cache_dir",
+        default="",
+        type=str,
+        help="Where do you want to store the pre-trained models downloaded from s3",
+    )
+    parser.add_argument(
+        "--label_max_seq_length",
+        default=15,
+        type=int,
+        help="The maximum total input sequence length after tokenization. Sequences longer "
+             "than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument("--logit_aggregation", type=str, default='max', help="Whether to aggregate logits by max value "
+                                                                             "or average value. Options:"
+                                                                             "'--max', '--avg'")
+    parser.add_argument("--label_attention", action="store_true", help="Whether to use the label attention model")
+
+    parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
+    parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
+    parser.add_argument("--do_test", action='store_true', help="Whether to run testing.")
+    parser.add_argument(
+        "--evaluate_during_training", action="store_true", help="Run evaluation during training at each logging step.",
+    )
+    parser.add_argument(
+        "--do_lower_case", action="store_true", help="Set this flag if you are using an uncased model.",
+    )
+
+    parser.add_argument(
+        "--per_gpu_train_batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.",
+    )
+    parser.add_argument(
+        "--per_gpu_eval_batch_size", default=8, type=int, help="Batch size per GPU/CPU for evaluation.",
+    )
+    parser.add_argument(
+        "--gradient_accumulation_steps",
+        type=int,
+        default=1,
+        help="Number of updates steps to accumulate before performing a backward/update pass.",
+    )
+
+    parser.add_argument('--do_iterative_class_weights', action='store_true', help="Whether to use iteratively "
+                                                                                  "calculated class weights")
+    parser.add_argument('--do_normal_class_weights', action='store_true', help="Whether to use normally "
+                                                                               "calculated class weights")
+    parser.add_argument('--do_ranking_loss', action='store_true', help="Whether to use the ranking loss component.")
+    parser.add_argument('--do_weighted_ranking_loss', action='store_true',
+                        help="Whether to use the weighted ranking loss component.")
+    parser.add_argument('--do_experimental_ranks_instead_of_labels', action='store_true', help='Whether to send ranks '
+                                                                                               'instead of binary labels to loss function')
+    parser.add_argument('--doc_batching', action='store_true', help="Whether to fit one document into a batch during")
+
+    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
+    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
+    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
+    parser.add_argument(
+        "--num_train_epochs", default=3.0, type=float, help="Total number of training epochs to perform.",
+    )
+    parser.add_argument(
+        "--max_steps",
+        default=-1,
+        type=int,
+        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+    )
+    parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup over warmup proportion.")
+
+    parser.add_argument("--logging_steps", type=int, default=500, help="Log every X updates steps.")
+    parser.add_argument("--save_steps", type=int, default=500, help="Save checkpoint every X updates steps.")
+    parser.add_argument(
+        "--eval_all_checkpoints",
+        action="store_true",
+        help="Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number",
+    )
+    parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
+    parser.add_argument(
+        "--overwrite_output_dir", action="store_true", help="Overwrite the content of the output directory",
+    )
+    parser.add_argument(
+        "--overwrite_cache", action="store_true", help="Overwrite the cached training and evaluation sets",
+    )
+    parser.add_argument("--seed", type=int, default=21, help="random seed for initialization")
+
+    parser.add_argument(
+        "--fp16",
+        action="store_true",
+        help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit",
+    )
+    parser.add_argument(
+        "--fp16_opt_level",
+        type=str,
+        default="O1",
+        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
+             "See details at https://nvidia.github.io/apex/amp.html",
+    )
+
+    parser.add_argument("--server_ip", type=str, default="", help="For distant debugging.")
+    parser.add_argument("--server_port", type=str, default="", help="For distant debugging.")
+
+
+
+
     args = parser.parse_args()
     cantemist_processor = CantemistReader(args)
     cantemist_processor.process_data()
 
-    # cantemist_processor.construct_dicts()
-    # cantemist_processor.filter_labels()
-    # temp = cantemist_processor.span_dict.copy()
-    # for code, spans in cantemist_processor.span_dict.items():
-    #     if code[-1] == "H":
-    #         print("Code:", code)
-    #         print("Spans:", spans)
-    #         print("Code:", code[:-2])
-    #         print("Spans:", temp[code[:-2]])
-    #         print("Official desc:", cantemist_processor.label_desc_dict[code[:-2]])
-    #         print("-"*50)
+    try:
+        processor = MyProcessor(args)
+    except:
+        cantemist_reader = CantemistReader(args)
+        cantemist_reader.process_data()
+        # spanish_reader = SpanishReader(args)
+        # spanish_reader.process_data()
+        # german_reader = GermanReader(args)
+        # german_reader.process_data()
+        processor = MyProcessor(args)
+    class_weights = processor.get_class_weights()
+    label_list = processor.get_labels()
+    num_labels = len(label_list)
+    args.num_labels = num_labels
 
-    # label_counts = cantemist_processor.filter_labels()
-    # label_counts = sorted(label_counts.items(), key=lambda pair: pair[1], reverse=True)
-    # inverted_label_counts = defaultdict(int)
-    # for label, count in label_counts.items():
-    #     inverted_label_counts[count] += 1
-    # print(label_counts[:100])
-    # print(sorted(inverted_label_counts.items(), key=lambda pair: pair[0]))
+    tokenizer = XLMRobertaTokenizer.from_pretrained('xlm-roberta-base',
+        do_lower_case=False,
+        cache_dir=None,
+    )
 
-    # avg_n_labels = np.average([len(labels) for labels in cantemist_processor.label_dict.values()])
-    # print("Average n labels:", avg_n_labels)
+
+    train_dataset, label_dataset, idx2id = load_and_cache_examples(args, tokenizer, evaluate=False, label_data=True)
