@@ -805,7 +805,7 @@ def evaluate(args, model, tokenizer, prefix=""):
     out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
 
 
-    preds = torch.nn.Sigmoid()(preds)
+    preds = sigmoid(preds)
 
 
     preds[preds < args.prediction_threshold] = 0
