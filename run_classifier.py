@@ -618,8 +618,8 @@ def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
                 batch = tuple(t.to(args.device) for t in batch)
 
             inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[2], "ranks": batch[4]}
-            print(inputs)
-            sys.exit()
+            # print(inputs)
+            # sys.exit()
             if args.model_type == 'bert':
                 inputs['token_type_ids'] = batch[-1]
 
