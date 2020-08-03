@@ -807,7 +807,7 @@ def evaluate(args, model, tokenizer, prefix=""):
 
 
     preds = sigmoid(preds)
-    print(preds)
+
 
     # preds = (preds > args.prediction_threshold).astype(int)
 
@@ -834,7 +834,7 @@ def evaluate(args, model, tokenizer, prefix=""):
         ids = ids[0]
     # ids = np.array([i for i in range(ids[-1]+1)])
 
-    with open(os.path.join(args.data_dir, "mlb_{}_{}.p".format(args.label_threshold, args.ignore_labelless_docs)),
+    with open(os.path.join(args.data_dir, "mlb_{}_{}.p".format(args.label_threshold, args.train_on_all)),
               "rb") as rf:
         mlb = pickle.load(rf)
     # preds = [mlb.classes_[preds[i, :].astype(bool)].tolist() for i in range(preds.shape[0])]
@@ -876,9 +876,11 @@ def evaluate(args, model, tokenizer, prefix=""):
 
 
 def generate_test_preds(args, model, tokenizer, prefix=""):
+
     test_output_dir = args.output_dir
 
     results = {}
+
 
     test_dataset, label_dataset, idx2id = load_and_cache_examples(args, tokenizer, test=True, label_data=True)
 
@@ -886,13 +888,20 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
         os.makedirs(test_output_dir)
 
     args.test_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
-    # Note that DistributedSampler samples randomly
 
+    # Note that DistributedSampler samples randomly
     test_sampler = SequentialSampler(test_dataset) if args.local_rank == -1 else DistributedSampler(test_dataset)
-    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.test_batch_size)
+
+    if args.doc_batching:
+        test_dataloader = DataLoader(test_dataset, sampler=None, batch_size=1, collate_fn=my_collate)
+    else:
+        test_dataloader = DataLoader(test_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+
     label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
     if args.label_attention:
         model.initialize_label_data(next(iter(label_dataloader)))
+    ##########
+
 
     # Predict!
     logger.info("***** Running test {} *****".format(prefix))
@@ -901,16 +910,28 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
     eval_loss = 0.0
     nb_eval_steps = 0
     preds = None
-    out_label_ids = None
     ids = []
 
     for batch in tqdm(test_dataloader, desc="Evaluating"):
 
         model.eval()
-        batch = tuple(t.to(args.device) for t in batch)
+        if args.doc_batching:
+            batch = tuple(tuple(ti.to(args.device) for ti in t) for t in batch)
+        else:
+            batch = tuple(t.to(args.device) for t in batch)
 
         with torch.no_grad():
-            inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[3]}
+            if args.doc_batching:
+                input_ids = batch[0][0]
+                attn_mask = batch[1][0]
+
+            else:
+                input_ids = batch[0]  # may need to fix this!
+                attn_mask = batch[1]  # may need to fix this!
+
+            inputs = {"doc_input_ids": input_ids, "doc_attention_mask": attn_mask, "labels": None, "ranks": ranks}
+            if args.model_type == 'bert':
+                inputs['token_type_ids'] = batch[-1][0] # prolly gonna need to fix this
 
             outputs = model(**inputs)
             tmp_eval_loss, logits = outputs[:2]
@@ -923,28 +944,52 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
         else:
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
         if len(ids) == 0:
-            ids.append(batch[4].detach().cpu().numpy())
+            if args.doc_batching:
+                ids.append(batch[3][0].detach().cpu().numpy().item())
+            else:
+                ids.append(batch[3].detach().cpu().numpy())
+
         else:
-            ids[0] = np.append(
-                ids[0], batch[4].detach().cpu().numpy(), axis=0)
+            if args.doc_batching:
+                ids.append(batch[3][0].detach().cpu().numpy().item())
+            else:
+                ids[0] = np.append(
+                    ids[0], batch[3].detach().cpu().numpy(), axis=0)
+
+
+
 
     eval_loss = eval_loss / nb_eval_steps
+    preds = preds.reshape((len(eval_dataset), args.num_labels))
     preds = sigmoid(preds)
 
-    preds = (preds > args.prediction_threshold).astype(int)
-    ids = ids[0]
+    preds[preds < args.prediction_threshold] = 0
 
-    with open(os.path.join(args.data_dir, "mlb_{}_{}.p".format(args.label_threshold, args.ignore_labelless_docs)),
+    sorted_preds_idx = np.flip(np.argsort(preds))
+    preds = (preds > args.prediction_threshold)
+
+    n_labels = np.sum(preds, axis=1)
+    avg_pred_n_labels = np.mean(n_labels)
+    preds = np.array([sorted_preds_idx[i, :n] for i, n in enumerate(n_labels)])
+
+    if not args.doc_batching:
+        ids = ids[0]
+    with open(os.path.join(args.data_dir, "mlb_{}_{}.p".format(args.label_threshold, args.train_on_all)),
               "rb") as rf:
         mlb = pickle.load(rf)
-    preds = [mlb.classes_[preds[i, :].astype(bool)].tolist() for i in range(preds.shape[0])]
+
+    preds = [mlb.classes_[preds[i][:]].tolist() for i in range(preds.shape[0])]
     id2preds = {val: preds[i] for i, val in enumerate(ids)}
     preds = [id2preds[val] if val in id2preds else [] for i, val in enumerate(ids)]
 
-    with open(os.path.join(args.output_dir, "preds_test.txt"), "w") as wf:
+    with open(os.path.join(args.output_dir, "preds_test.tsv"), "w") as wf:
+        wf.write("file\tcode\n")
         for idx, doc_id in enumerate(ids):
-            line = str(idx2id[doc_id]) + "\t" + "|".join(preds[idx]) + "\n"
-            wf.write(line)
+            for p in preds[idx]:
+                line = str(idx2id[doc_id]) + "\t" + p + "\n"
+                wf.write(line)
+
+    print("Average number of labels/doc:", avg_pred_n_labels)
 
 
 def evaluate_test_preds(args):
