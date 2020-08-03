@@ -761,7 +761,7 @@ def evaluate(args, model, tokenizer, prefix=""):
                 inputs['token_type_ids'] = batch[-1][0] # prolly gonna need to fix this
 
             print(inputs)
-            sys.exit()
+
 
 
 
@@ -780,6 +780,10 @@ def evaluate(args, model, tokenizer, prefix=""):
                 out_label_ids = batch[2][0].detach().cpu().numpy()
             else:
                 out_label_ids = batch[2].detach().cpu().numpy()
+
+            print(preds)
+            print(out_label_ids)
+            sys.exit()
         else:
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
             # preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
