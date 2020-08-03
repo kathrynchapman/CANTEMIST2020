@@ -803,7 +803,7 @@ def evaluate(args, model, tokenizer, prefix=""):
 
 
     out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
-    print(out_label_ids.tolist())
+    
 
 
     preds = sigmoid(preds)
@@ -820,6 +820,7 @@ def evaluate(args, model, tokenizer, prefix=""):
     results.update(result)
 
     n_labels = np.sum(preds, axis=1)
+    print("n_labels.shape".upper(), n_labels.shape)
     avg_pred_n_labels = np.mean(n_labels)
     avg_true_n_labels = np.mean(np.sum(out_label_ids, axis=1))
     preds = np.array([sorted_preds_idx[i, :n] for i, n in enumerate(n_labels)])
