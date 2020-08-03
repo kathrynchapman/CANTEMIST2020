@@ -159,8 +159,8 @@ class MyProcessor(DataProcessor):
                     labels = d[-2].tolist()
                     ranks = d[-1].tolist()
                 except:
-                    labels = [None]
-                    ranks = [None]
+                    labels = [0]
+                    ranks = [0]
                 examples.append(InputExample(guid=guid, text=text, labels=labels, ranks=ranks))
             else:
                 examples.append(InputExample(guid=guid, text=text))
