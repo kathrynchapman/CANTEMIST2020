@@ -760,11 +760,6 @@ def evaluate(args, model, tokenizer, prefix=""):
             if args.model_type == 'bert':
                 inputs['token_type_ids'] = batch[-1][0] # prolly gonna need to fix this
 
-            print(inputs)
-
-
-
-
             #############################
             outputs = model(**inputs)
             tmp_eval_loss, logits = outputs[:2]
@@ -789,10 +784,6 @@ def evaluate(args, model, tokenizer, prefix=""):
                 out_label_ids = np.append(out_label_ids, batch[2][0].detach().cpu().numpy(), axis=0)
             else:
                 out_label_ids = np.append(out_label_ids, batch[2].detach().cpu().numpy(), axis=0)
-            print(preds)
-            print(out_label_ids)
-            sys.exit()
-
 
         if len(ids) == 0:
             if args.doc_batching:
@@ -816,6 +807,7 @@ def evaluate(args, model, tokenizer, prefix=""):
 
 
     preds = sigmoid(preds)
+    print(preds)
 
     # preds = (preds > args.prediction_threshold).astype(int)
 
