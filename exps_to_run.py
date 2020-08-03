@@ -6,7 +6,8 @@ from beautifultable import BeautifulTable
 from datetime import datetime
 
 models = ['baseline', 'label_attention']
-bert_flavors = ['ml_bert', 'xlmr']
+bert_flavors = ['ml_bert', 'xlmr', 'fp-xlmr']
+bert_flavors = ['ml_bert', 'xlmr', 'fp-xlmr']
 num_epohcs = ['any int']
 doc_batching = ['no_doc_batching', 'doc_batching_max']
 ranking_loss = ['no_ranking_loss', 'ranking_loss', 'weighted_ranking_loss']
