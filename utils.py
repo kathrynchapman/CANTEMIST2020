@@ -104,16 +104,16 @@ class MyProcessor(DataProcessor):
 
     def __init__(self, args, test_file=None):
         self.train_file = os.path.join(args.data_dir,
-                                       'train_{}_{}.p'.format(args.label_threshold, args.ignore_labelless_docs))
+                                       'train_{}_{}.p'.format(args.label_threshold, args.train_on_all))
         self.dev_file = os.path.join(args.data_dir,
-                                     'dev_{}_{}.p'.format(args.label_threshold, args.ignore_labelless_docs))
+                                     'dev_{}_{}.p'.format(args.label_threshold, args.ignore_labeltrain_on_allless_docs))
         self.test_file = os.path.join(args.data_dir,
-                                      'test_{}_{}.p'.format(args.label_threshold, args.ignore_labelless_docs))
+                                      'test_{}_{}.p'.format(args.label_threshold, args.train_on_all))
         self.label_desc_file = os.path.join(args.data_dir, "label_desc_{}.p".format(str(args.label_threshold)))
         self.mlb = pickle_load(
-            os.path.join(args.data_dir, "mlb_{}_{}.p".format(str(args.label_threshold), args.ignore_labelless_docs)))
+            os.path.join(args.data_dir, "mlb_{}_{}.p".format(str(args.label_threshold), args.train_on_all)))
         self.class_weights = pickle_load(
-            os.path.join(args.data_dir, "class_weights_{}.p".format(str(len(self.mlb.classes_)))))
+            os.path.join(args.data_dir, "class_weights_{}_{}.p".format(str(len(self.mlb.classes_)), args.train_on_all)))
 
         data = self._read_tsv(self.train_file)
         y = np.array([i[-1] for i in data])

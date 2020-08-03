@@ -1067,6 +1067,7 @@ def main():
                                                                              "or average value. Options:"
                                                                              "'--max', '--avg'")
     parser.add_argument("--preprocess", action="store_true", help="Whether to do the initial processing of the data.")
+    parser.add_argument("--train_on_all", action="store_true", help="Whether to train on train + dev for final testing.")
     parser.add_argument("--label_attention", action="store_true", help="Whether to use the label attention model")
     parser.add_argument("--ignore_labelless_docs", action="store_true",
                         help="Whether to ignore the documents which have no labels.")

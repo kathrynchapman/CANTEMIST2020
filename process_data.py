@@ -33,6 +33,7 @@ class CantemistReader():
         self.train_path = os.path.join(cantemist_path, "train-set-to-publish/")
         self.test_path = os.path.join(cantemist_path, "test-background-set-to-publish/")
         self.dev_path = os.path.join(cantemist_path, "dev-set1-to-publish/")
+        self.train_on_all = args.train_on_all
         self.data_dict = dict()
         self.label_dict = defaultdict(list)
         self.train_ids = []
@@ -43,9 +44,9 @@ class CantemistReader():
         self.label_desc_dict = defaultdict(str)
         self.span_dict = defaultdict(list)
         self.class_weight_dict = defaultdict(int)
-        self.train_file = 'train_{}_{}'.format(self.args.label_threshold, self.args.ignore_labelless_docs)
-        self.dev_file = 'dev_{}_{}'.format(self.args.label_threshold, self.args.ignore_labelless_docs)
-        self.test_file = 'test_{}_{}'.format(self.args.label_threshold, self.args.ignore_labelless_docs)
+        self.train_file = 'train_{}_{}'.format(self.args.label_threshold, self.args.train_on_all)
+        self.dev_file = 'dev_{}_{}'.format(self.args.label_threshold, self.args.train_on_all)
+        self.test_file = 'test_{}_{}'.format(self.args.label_threshold, self.args.train_on_all)
         self.n_disc_docs = 0
         self.total_labeled_docs = 0
         if not os.path.exists('processed_data/cantemist/'):
@@ -285,10 +286,14 @@ class CantemistReader():
                 with open('processed_data/cantemist/{}.tsv'.format(file), 'w') as outf:
                     outf.write('id\ttext\tlabels\n')
 
-                    if file == self.dev_file:
+                    if file == self.dev_file and self.args.train_on_all == False:
                         ids = self.dev_ids
-                    elif file == self.train_file:
+                    elif file == self.train_file and self.args.train_on_all == False:
                         ids = self.train_ids
+                    elif self.args.train_on_all == True and file == self.train_file:
+                        ids = self.train_ids + self.dev_ids
+                    elif self.args.train_on_all == True and file == self.dev_file:
+                        ids = []
                     else:
                         ids = self.test_ids
                         test = True
@@ -342,9 +347,9 @@ class CantemistReader():
                 data = [(data.iloc[idx, 0], data.iloc[idx, 1], labels_binarized[idx, :], labels_ranked[idx,:]) for idx in range(len(data))]
             save('processed_data/cantemist/{}.p'.format(data_type), data)
             if not os.path.exists('processed_data/cantemist/mlb_{}_{}.p'.format(self.args.label_threshold,
-                                                                                self.args.ignore_labelless_docs)):
+                                                                                self.args.train_on_all)):
                 save('processed_data/cantemist/mlb_{}_{}.p'.format(self.args.label_threshold,
-                                                                   self.args.ignore_labelless_docs),
+                                                                   self.args.train_on_all),
                      self.mlb)
 
 
@@ -370,8 +375,8 @@ class CantemistReader():
         # we only want the numbers now, not the codes themselves....
         class_weights = [v for c, v in class_weights]
 
-        if not os.path.exists('processed_data/cantemist/class_weights_{}.p'.format(str(len(self.class_weight_dict)))):
-            save('processed_data/cantemist/class_weights_{}.p'.format(str(len(self.mlb.classes_))),
+        if not os.path.exists('processed_data/cantemist/class_weights_{}_{}.p'.format(str(len(self.class_weight_dict)), self.train_on_all)):
+            save('processed_data/cantemist/class_weights_{}_{}.p'.format(str(len(self.mlb.classes_)), self.train_on_all),
                  class_weights)
 
 
