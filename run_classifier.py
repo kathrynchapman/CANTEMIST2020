@@ -930,7 +930,7 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
                 inputs['token_type_ids'] = batch[-1][0] # prolly gonna need to fix this
 
             outputs = model(**inputs)
-            logits = outputs
+            logits = outputs[0]
 
             # eval_loss += tmp_eval_loss.mean().item()
         nb_eval_steps += 1
