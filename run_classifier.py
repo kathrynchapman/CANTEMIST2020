@@ -803,6 +803,7 @@ def evaluate(args, model, tokenizer, prefix=""):
 
 
     out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
+    print(out_label_ids.tolist())
 
 
     preds = sigmoid(preds)
