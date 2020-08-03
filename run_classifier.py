@@ -956,12 +956,12 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
 
 
     eval_loss = eval_loss / nb_eval_steps
-    preds = preds.reshape((len(eval_dataset), args.num_labels))
+    preds = preds.reshape((len(test_dataset), args.num_labels))
     preds = sigmoid(preds)
 
     preds[preds < args.prediction_threshold] = 0
 
-    sorted_preds_idx = np.flip(np.argsort(preds))
+    sorted_preds_idx = np.flip(np.argsort(preds), axis=1)
     preds = (preds > args.prediction_threshold)
 
     n_labels = np.sum(preds, axis=1)
