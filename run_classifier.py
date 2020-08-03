@@ -508,7 +508,7 @@ def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
     #     # print(d[1].shape)
     #     print("*"*100)
 
-    sys.exit()
+    # sys.exit()
 
     if args.max_steps > 0:
         t_total = args.max_steps
@@ -619,6 +619,7 @@ def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
 
             inputs = {"doc_input_ids": batch[0], "doc_attention_mask": batch[1], "labels": batch[2], "ranks": batch[4]}
             print(inputs)
+            sys.exit()
             if args.model_type == 'bert':
                 inputs['token_type_ids'] = batch[-1]
 
