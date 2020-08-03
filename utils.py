@@ -159,8 +159,8 @@ class MyProcessor(DataProcessor):
                     labels = d[-2].tolist()
                     ranks = d[-1].tolist()
                 except:
-                    labels = None
-                    ranks = None
+                    labels = [None]
+                    ranks = [None]
                 examples.append(InputExample(guid=guid, text=text, labels=labels, ranks=ranks))
             else:
                 examples.append(InputExample(guid=guid, text=text))
@@ -461,10 +461,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
     if args.doc_batching:
         all_input_ids = [torch.tensor(f.input_ids, dtype=torch.long) for f in doc_features]
         all_attention_mask = [torch.tensor(f.input_mask, dtype=torch.long) for f in doc_features]
-        try:
-            all_labels = [torch.tensor(f.label_ids, dtype=torch.long) for f in doc_features]
-        except:
-            all_labels = torch.tensor([f.label_ids for f in doc_features], dtype=torch.long)
+        all_labels = [torch.tensor(f.label_ids, dtype=torch.long) for f in doc_features]
         all_doc_ids = [torch.tensor(f.guid, dtype=torch.long) for f in doc_features]
         all_label_ranks = [torch.tensor(f.label_ranks, dtype=torch.long) for f in doc_features]
 
