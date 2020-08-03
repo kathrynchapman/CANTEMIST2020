@@ -1250,14 +1250,14 @@ def main():
         do_lower_case=args.do_lower_case,
         cache_dir=args.cache_dir if args.cache_dir else None,
     )
-    # model = model_class.from_pretrained(
-    #     args.model_name_or_path,
-    #     from_tf=bool(".ckpt" in args.model_name_or_path),
-    #     config=config,
-    #     loss_fct=args.loss_fct,
-    #     args=args,
-    #     class_weights=class_weights,
-    # )
+    model = model_class.from_pretrained(
+        args.model_name_or_path,
+        from_tf=bool(".ckpt" in args.model_name_or_path),
+        config=config,
+        loss_fct=args.loss_fct,
+        args=args,
+        class_weights=class_weights,
+    )
 
 
     # model = model_class()
@@ -1269,8 +1269,8 @@ def main():
     if args.local_rank == 0:
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
 
-    model = None
-    # model.to(args.device)
+
+    model.to(args.device)
 
     logger.info("Training/evaluation parameters %s", args)
 
