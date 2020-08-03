@@ -781,9 +781,6 @@ def evaluate(args, model, tokenizer, prefix=""):
             else:
                 out_label_ids = batch[2].detach().cpu().numpy()
 
-            print(preds)
-            print(out_label_ids)
-            sys.exit()
         else:
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
             # preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
@@ -792,6 +789,9 @@ def evaluate(args, model, tokenizer, prefix=""):
                 out_label_ids = np.append(out_label_ids, batch[2][0].detach().cpu().numpy(), axis=0)
             else:
                 out_label_ids = np.append(out_label_ids, batch[2].detach().cpu().numpy(), axis=0)
+            print(preds)
+            print(out_label_ids)
+            sys.exit()
 
 
         if len(ids) == 0:
