@@ -800,9 +800,10 @@ def evaluate(args, model, tokenizer, prefix=""):
 
     eval_loss = eval_loss / nb_eval_steps
 
-    print(preds)
+    print(preds.tolist())
     print(preds.shape)
     preds = preds.reshape((len(eval_dataset), args.num_labels))
+    print(preds[-1,:])
 
     out_label_ids = out_label_ids.reshape((len(eval_dataset), args.num_labels))
 
