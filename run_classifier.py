@@ -176,7 +176,9 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
         pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
+        print("POOLED OUPUT SHAPE", pooled_output.shape)
         logits = self.classifier(pooled_output)
+        print("LOGITS SHAPE", logits.shape)
 
         logits = logits.view(-1, self.num_labels)
 
@@ -1383,7 +1385,7 @@ def main():
                 model = model_class.from_pretrained(checkpoint, args=args, loss_fct=args.loss_fct)
                 model.to(args.device)
                 predictions = generate_test_preds(args, model, tokenizer, prefix=global_step)
-        evaluate_test_preds(args)
+        # evaluate_test_preds(args)
 
     return results
 
