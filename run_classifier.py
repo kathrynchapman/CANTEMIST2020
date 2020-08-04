@@ -528,7 +528,8 @@ def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
         {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
     ]
 
-    num_warmup_steps = int(len(train_dataloader) * args.warmup_proportion) * args.num_train_epochs
+    # num_warmup_steps = int(len(train_dataloader) * args.warmup_proportion) * args.num_train_epochs
+    num_warmup_steps = int(len(train_dataloader) * args.warmup_proportion * args.num_train_epochs)
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon, correct_bias=False)
     scheduler = get_linear_schedule_with_warmup(
         optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=t_total

@@ -91,7 +91,7 @@ def fill_dict(exp_dict):
                 exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['Notes'] = notes + \
                                                                                                       " (last edited {})".format(
                                                                                                           dt_string)
-                save(exp_dict, 'exp_dict.p')
+                save(exp_dict, args.dict_name)
                 continue
 
         MAP = input("Enter MAP: ")
@@ -111,7 +111,7 @@ def fill_dict(exp_dict):
         if notes or add_to_notes:
             exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]]['Notes'] = notes + add_to_notes
 
-        save(exp_dict, 'exp_dict.p')
+        save(exp_dict, args.dict_name)
         done = True if input("Do you have another experiment to enter? [y, n]: ") == 'n' else False
         if not done:
             print('-' * 100)
@@ -231,7 +231,7 @@ def delete(exp_dict, backup_dict):
 
         to_delete = exp_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4][inputs[5]]].pop(inputs[6])
         backup_dict[inputs[0]][inputs[1]][inputs[2]][inputs[3]][inputs[4]][inputs[5]][inputs[6]] = to_delete
-        save(exp_dict, 'exp_dict.p')
+        save(exp_dict, args.dict_name)
         save(backup_dict, 'backup.p')
         done = input("Do you have another entry to delete? [y, n] ")
         done = True if done == 'y' else False
