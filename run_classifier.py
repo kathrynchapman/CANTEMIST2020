@@ -894,7 +894,7 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
     if args.doc_batching:
         test_dataloader = DataLoader(test_dataset, sampler=None, batch_size=1, collate_fn=my_collate)
     else:
-        test_dataloader = DataLoader(test_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.eval_batch_size)
 
     label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
     if args.label_attention:

@@ -191,7 +191,9 @@ def viewall(exp_dict):
                                 ed = 'N/A' if ed == 0.0 else ed
                                 avg_nlabels = 'N/A' if avg_nlabels == 0.0 else avg_nlabels
 
-                                table.rows.append([m_, b_t, n_ep, db_, rl_, cw_, lf, map, f1, p, r, avg_nlabels, notes, ed])
+                                if rl_ == 'N' and cw_ =='N':
+
+                                    table.rows.append([m_, b_t, n_ep, db_, rl_, cw_, lf, map, f1, p, r, avg_nlabels, notes, ed])
     print(table)
 
 def delete(exp_dict, backup_dict):

@@ -32,9 +32,9 @@ class CantemistReader():
     """
 
     def __init__(self, args=''):
-        self.train_path = os.path.join(cantemist_path, "train-set-to-publish/")
-        self.test_path = os.path.join(cantemist_path, "test-background-set-to-publish/")
-        self.dev_path = os.path.join(cantemist_path, "dev-set1-to-publish/")
+        self.train_path = os.path.join(cantemist_path, "train-set/")
+        self.test_path = os.path.join(cantemist_path, "test-set/")
+        self.dev_path = os.path.join(cantemist_path, "dev-set1/")
         self.train_on_all = args.train_on_all
         self.data_dict = dict()
         self.label_dict = defaultdict(list)
