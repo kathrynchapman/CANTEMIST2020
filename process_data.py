@@ -65,17 +65,18 @@ class CantemistReader():
             path = self.train_path + 'cantemist-coding/txt/'
 
         elif test:
-            path = self.test_path
+            path = self.test_path + 'cantemist-ner/'
             id_list = self.test_ids
         else:
             path = self.dev_path + 'cantemist-coding/txt/'
 
         all_file_names = os.listdir(path)
         for f_name in all_file_names:
-            with open(path + f_name) as f:
-                self.data_dict[f_name[:-4]] = f.read().replace('\n', ' ').replace('\t', ' ')
-                if test:
-                    id_list.append(f_name[:-4])
+            if f_name[-3:] == 'txt':
+                with open(path + f_name) as f:
+                    self.data_dict[f_name[:-4]] = f.read().replace('\n', ' ').replace('\t', ' ')
+                    if test:
+                        id_list.append(f_name[:-4])
 
     def construct_label_dict(self, train=False):
         """
