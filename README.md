@@ -5,6 +5,14 @@ To run the classifiers, one must first clone the official metric repo: https://g
 ```
 git clone https://github.com/TeMU-BSC/cantemist-evaluation-library.git
 ```
+Create a conda environment from the ICDenv.yml file.
+```
+conda env create -f ICDenv.yml
+```
+Then activate it:
+```
+conda activate ICDenv
+```
 Then, from within the CANTEMIST2020 directory: <br>
 -run the label attention classifier with:
 ```
@@ -18,6 +26,8 @@ python run_classifier.py
       --loss_fct bbce
       --num_train_epochs 45
       --doc_batching
+      --do_train
+      --do_eval
 
  ```
 In order to completely replicate results, a pre-trained XLM-RoBERTa-Base model will need
