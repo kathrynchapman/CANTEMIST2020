@@ -1,1 +1,5 @@
 .DS_Store
+plackett_luce.py
+exps_to_run.py
+exp_dict.p
+git_push.py
