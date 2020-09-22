@@ -14,7 +14,7 @@ import logging
 import random
 import json
 import argparse
-from loss import BalancedBCEWithLogitsLoss, RankingLoss
+from loss import BalancedBCEWithLogitsLoss
 import random
 from utils import *
 import scipy.stats as ss
