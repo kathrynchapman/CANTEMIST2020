@@ -109,7 +109,7 @@ class MyProcessor(DataProcessor):
                                      'dev_{}_{}.p'.format(args.label_threshold, args.train_on_all))
         self.test_file = os.path.join(args.data_dir,
                                       'test_{}_{}.p'.format(args.label_threshold, args.train_on_all))
-        self.label_desc_file = os.path.join(args.data_dir, "label_desc_{}.p".format(str(args.label_threshold)))
+        self.label_desc_file = os.path.join(args.data_dir, "label_desc_{}.p".format(str(args.label_max_seq_length)))
         self.mlb = pickle_load(
             os.path.join(args.data_dir, "mlb_{}_{}.p".format(str(args.label_threshold), args.train_on_all)))
         self.class_weights = pickle_load(
@@ -401,7 +401,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, label_d
         "cached_{}_{}_{}_{}_{}".format(
             'dev' if evaluate else 'test' if test else 'train',
             list(filter(None, args.model_name_or_path.split("/"))).pop(),
-            str(args.doc_max_seq_length), str(args.label_threshold), str(args.doc_batching)
+            str(args.doc_max_seq_length), str(args.label_max_seq_length), str(args.doc_batching)
         ),
     )
     if label_data:

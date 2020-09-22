@@ -387,8 +387,8 @@ class CantemistReader():
 
                 assert list(self.mlb.classes_) == [k for k, v in label_descs_to_save], print("Sorry, label order mismatch")
 
-                if not os.path.exists('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold)):
-                    save('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_threshold),
+                if not os.path.exists('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_max_seq_length)):
+                    save('processed_data/cantemist/label_desc_{}.p'.format(self.args.label_max_seq_length),
                          label_descs_to_save)
 
 

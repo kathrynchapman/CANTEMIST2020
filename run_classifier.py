@@ -52,7 +52,7 @@ class ICDDataloader(Dataset):
 
     def __getitem__(self, idx):
         return self.data[idx]
-        # return self.data.iloc[idx,]
+
 
 
 def plackett_luce(some_list):
@@ -62,12 +62,6 @@ def plackett_luce(some_list):
 
 
 def simple_accuracy(preds, labels):
-    # print(preds)
-    # print(labels)
-    # print("Preds type: ", type(preds))
-    # print("Labels type: ", type(labels))
-    # print("Preds shape: ", preds.shape)
-    # print("Labels shape: ", labels.shape)
     return (preds == labels).mean()
 
 
@@ -160,7 +154,6 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 position_ids=position_ids,
                 head_mask=head_mask,
                 inputs_embeds=inputs_embeds,
-                # output_attentions=output_attentions,
             )
         elif self.args.model_type == 'bert':
             outputs = self.bert(
@@ -170,7 +163,6 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 position_ids=position_ids,
                 head_mask=head_mask,
                 inputs_embeds=inputs_embeds,
-                # output_attentions=output_attentions,
             )
 
         pooled_output = outputs[1]
@@ -189,34 +181,8 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
                 logits = torch.mean(logits, axis=0)
 
 
-        # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
-        # temp = torch.mean(torch.abs(logits.view(-1, self.num_labels)-labels.view(-1, self.num_labels)).float()+1, axis=0)
-
         outputs = (logits,) + outputs[2:]  # add hidden states and attention if they are here
 
-        # #############
-        # # get the sequence-level document representations
-        # doc_seq_output = doc_outputs[0]
-        # # print("DOC SEQ OUTPUT SHAPE:", doc_seq_output.shape)
-        # batch_size = doc_seq_output.shape[0]
-        # # print("BATCH SIZE:", batch_size)
-        #
-        # # get the sequence-level label description representations
-        # label_seq_output = label_outputs[0]
-        #
-        # label_seq_output = label_seq_output.reshape(self.num_labels * self.args.label_max_seq_length, self.hidden_size)
-        # temp = torch.matmul(doc_seq_output, label_seq_output.T)
-        # temp = temp.permute(0, 2, 1)
-        #
-        # temp = self.w1(temp)
-        #
-        # temp = temp.reshape(batch_size, self.num_labels, self.args.label_max_seq_length)
-        #
-        # temp = self.w2(temp)
-        #
-        # logits = temp.view(-1, self.num_labels)
-        #
-        # ############
         if labels is not None:
             if self.args.do_iterative_class_weights:
                 # temp = logits.view(-1, self.num_labels) - labels.view(-1, self.num_labels) + 1
@@ -242,30 +208,18 @@ class BertForMultiLabelSequenceClassification(BertPreTrainedModel):
             if self.loss_fct == 'bce':
                 loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
             elif self.loss_fct == 'bbce':
-                loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True, weights=class_weights)
+                loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True)
             elif self.loss_fct == 'cel':
                 loss_fct = CrossEntropyLoss()
 
             if self.loss_fct != 'none':
-                if self.args.do_experimental_ranks_instead_of_labels:
-                    loss = loss_fct(logits.view(-1, self.num_labels), ranks.float().view(-1, self.num_labels))
-                else:
-                    loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1,self.num_labels))
+                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1,self.num_labels))
             else:
                 loss = 0
 
-            if self.args.do_ranking_loss or self.args.do_weighted_ranking_loss:
-                if not self.args.do_weighted_ranking_loss:
-                    loss_fct = RankingLoss(self.args.doc_batching, weights=None)
-                else:
-                    loss_fct = RankingLoss(self.args.doc_batching, weights=class_weights)
-                loss += loss_fct(logits, ranks)
+
             outputs = (loss,) + outputs
 
-
-
-            # loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-            # outputs = (loss,) + outputs
         self.iteration += 1
         return outputs  # (loss), logits, (hidden_states), (attentions)
 
@@ -358,11 +312,6 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
             label_outputs = self.roberta(
                 self.label_data[0].cuda(),
                 attention_mask=self.label_data[1].cuda(),
-                # token_type_ids=token_type_ids,
-                # position_ids=position_ids,
-                # head_mask=head_mask,
-                # inputs_embeds=inputs_embeds,
-                # output_attentions=output_attentions,
             )
         elif self.args.model_type == 'bert':
             doc_outputs = self.bert(
@@ -372,17 +321,13 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
                 position_ids=position_ids,
                 head_mask=head_mask,
                 inputs_embeds=inputs_embeds,
-                # output_attentions=output_attentions,
+
             )
 
             label_outputs = self.bert(
                 self.label_data[0].cuda(),
                 attention_mask=self.label_data[1].cuda(),
                 token_type_ids=self.label_data[-1].cuda(),
-                # position_ids=position_ids,
-                # head_mask=head_mask,
-                # inputs_embeds=inputs_embeds,
-                # output_attentions=output_attentions,
             )
 
         # get the sequence-level document representations
@@ -442,24 +387,15 @@ class BertForMLSCWithLabelAttention(BertPreTrainedModel):
             if self.loss_fct == 'bce':
                 loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
             elif self.loss_fct == 'bbce':
-                loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True, weights=class_weights)
+                loss_fct = BalancedBCEWithLogitsLoss(grad_clip=True)
             elif self.loss_fct == 'cel':
                 loss_fct = CrossEntropyLoss()
 
             if self.loss_fct != 'none':
-                if self.args.do_experimental_ranks_instead_of_labels:
-                    loss = loss_fct(logits.view(-1, self.num_labels), ranks.float().view(-1, self.num_labels))
-                else:
-                    loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
+                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels))
             else:
                 loss = 0
 
-            if self.args.do_ranking_loss or self.args.do_weighted_ranking_loss:
-                if not self.args.do_weighted_ranking_loss:
-                    loss_fct = RankingLoss(self.args.doc_batching, weights=None)
-                else:
-                    loss_fct = RankingLoss(self.args.doc_batching, weights=class_weights)
-                loss += loss_fct(logits, ranks)
             outputs = (loss,) + outputs
 
             # loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
@@ -502,15 +438,6 @@ def train(args, train_dataset, label_dataset, model, tokenizer, class_weights):
 
     label_dataloader = DataLoader(label_dataset, sampler=None, batch_size=len(label_dataset))
 
-    # for d in train_dataloader:
-    #     print(d)
-    #     print("len(d)", len(d))
-    #     print("type(d)", type(d))
-    #     # print(d[0].shape)
-    #     # print(d[1].shape)
-    #     print("*"*100)
-
-    # sys.exit()
 
     if args.max_steps > 0:
         t_total = args.max_steps
@@ -769,10 +696,8 @@ def evaluate(args, model, tokenizer, prefix=""):
 
             eval_loss += tmp_eval_loss.mean().item()
         nb_eval_steps += 1
-        # doc_dataset = TensorDataset(all_input_ids, all_attention_mask, all_labels,
-        #                                         all_doc_ids, all_label_ranks, all_token_type_ids)
+
         if preds is None:
-            # preds = logits.detach().cpu().numpy()
             preds = logits.detach().cpu().numpy()
             if args.doc_batching:
                 out_label_ids = batch[2][0].detach().cpu().numpy()
@@ -781,8 +706,7 @@ def evaluate(args, model, tokenizer, prefix=""):
 
         else:
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-            # preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-            # print(len(preds))
+
             if args.doc_batching:
                 out_label_ids = np.append(out_label_ids, batch[2][0].detach().cpu().numpy(), axis=0)
             else:
@@ -827,19 +751,18 @@ def evaluate(args, model, tokenizer, prefix=""):
     avg_true_n_labels = np.mean(np.sum(out_label_ids, axis=1))
     preds = np.array([sorted_preds_idx[i, :n] for i, n in enumerate(n_labels)])
 
-    # preds = np.array(sorted_preds_idx[:n_labels])
+
 
     if not args.doc_batching:
         ids = ids[0]
-    # ids = np.array([i for i in range(ids[-1]+1)])
+
 
     with open(os.path.join(args.data_dir, "mlb_{}_{}.p".format(args.label_threshold, args.train_on_all)),
               "rb") as rf:
         mlb = pickle.load(rf)
-    # preds = [mlb.classes_[preds[i, :].astype(bool)].tolist() for i in range(preds.shape[0])]
+
 
     preds = [mlb.classes_[preds[i][:]].tolist() for i in range(preds.shape[0])]
-    # preds = mlb.classes_[preds[:]].tolist()
 
     id2preds = {val: preds[i] for i, val in enumerate(ids)}
     preds = [id2preds[val] if val in id2preds else [] for i, val in enumerate(ids)]
@@ -852,7 +775,7 @@ def evaluate(args, model, tokenizer, prefix=""):
                 wf.write(line)
 
     eval_cmd = 'python cantemist-evaluation-library/src/main.py -g ' \
-               'cantemist/dev-set1-to-publish/cantemist-coding/dev1-coding.tsv -p {}/preds_development.tsv ' \
+               'cantemist/dev-set1/cantemist-coding/dev1-coding.tsv -p {}/preds_development.tsv ' \
                '-c cantemist-evaluation-library/valid-codes.tsv -s coding'.format(args.output_dir)
 
     output_eval_file = os.path.join(eval_output_dir, "eval_results.txt")
@@ -991,49 +914,7 @@ def generate_test_preds(args, model, tokenizer, prefix=""):
     print("Average number of labels/doc:", avg_pred_n_labels)
 
 
-def evaluate_test_preds(args):
-    results = {}
-    with open(os.path.join(args.output_dir, "preds_test.txt"), "r") as rf:
-        preds = [line.split('\t') for line in rf.read().split('\n') if line]
-        pred_ids, preds = [l[0] for l in preds], [l[1].split('|') for l in preds]
 
-    with open(os.path.join(args.data_dir, "test_gold_{}.tsv".format(args.ignore_labelless_docs)), "r") as rf:
-        gold = [line.split('\t') for line in rf.read().split('\n')[1:] if line]
-        gold_ids, gold = [l[0] for l in gold], [l[1].split('|') for l in gold]
-
-    assert pred_ids == gold_ids, print("Preds/Gold IDs mismatch")
-    mlb_test = MultiLabelBinarizer()
-    mlb_test.fit(gold + preds)
-    num_uniq_pred_labels = len(set([item for sublist in preds for item in sublist]))
-    num_uniq_gold_labels = len(set([item for sublist in gold for item in sublist]))
-    gold = mlb_test.transform(gold)
-    preds = mlb_test.transform(preds)
-
-    result = acc_and_f1(preds, gold)
-    results.update(result)
-
-    output_test_file = os.path.join(args.output_dir, "test_results.txt")
-    with open(output_test_file, "w") as writer:
-        logger.info("***** Test Results Normal *****")
-        logger.info("   Num Uniq Total Labels {} ".format(str(len(mlb_test.classes_))))
-        logger.info("   Num Uniq Pred Labels {} ".format(str(num_uniq_pred_labels)))
-        logger.info("   Num Uniq Gold Labels {} ".format(str(num_uniq_gold_labels)))
-        for key in sorted(result.keys()):
-            logger.info("  %s = %s", key, str(result[key]))
-            writer.write("%s = %s\n" % (key, str(result[key])))
-
-    eval_cmd = 'python evaluation.py --ids_file="{}" --anns_file="{}" --dev_file="{}" --out_file="{}"'
-
-    eval_cmd = eval_cmd.format(
-        "../CLEF_Datasets_ICD/2019_German/nts_icd_test/ids_test.txt",
-        "../CLEF_Datasets_ICD/2019_German/nts_icd_test/anns_test.txt",
-        "{}/preds_test.txt".format(args.output_dir),
-        "test_output.txt"
-    )
-
-    eval_results = os.popen(eval_cmd).read()
-    print("*** Eval results with challenge script: *** ")
-    print(eval_results)
 
 
 def main():
@@ -1145,11 +1026,7 @@ def main():
                                                                                   "calculated class weights")
     parser.add_argument('--do_normal_class_weights', action='store_true', help="Whether to use normally "
                                                                                "calculated class weights")
-    parser.add_argument('--do_ranking_loss', action='store_true', help="Whether to use the ranking loss component.")
-    parser.add_argument('--do_weighted_ranking_loss', action='store_true',
-                        help="Whether to use the weighted ranking loss component.")
-    parser.add_argument('--do_experimental_ranks_instead_of_labels', action='store_true', help='Whether to send ranks '
-                                                                                               'instead of binary labels to loss function')
+
     parser.add_argument('--doc_batching', action='store_true', help="Whether to fit one document into a batch during")
 
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
@@ -1302,13 +1179,6 @@ def main():
         class_weights=class_weights,
     )
 
-
-    # model = model_class()
-
-    # for name, param in model.named_parameters():
-    #     if param.requires_grad:
-    #         print(name)
-
     if args.local_rank == 0:
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
 
@@ -1386,16 +1256,10 @@ def main():
                 model = model_class.from_pretrained(checkpoint, args=args, loss_fct=args.loss_fct)
                 model.to(args.device)
                 predictions = generate_test_preds(args, model, tokenizer, prefix=global_step)
-        # evaluate_test_preds(args)
+
 
     return results
 
 
 if __name__ == '__main__':
     main()
-
-    """
-    Next steps: rewrite predict() function so I can evaluate on the test set, against:
-        1) FULL labels
-        2) ignoring labelless docs (set a flag for this)
-    """

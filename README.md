@@ -25,7 +25,7 @@ to be further pretrained using the MLM objective on all train, dev, and test dat
 The command for this is:
 ```
 python run_language_modeling.py 
-      --output_dir futher_pretrained_xlmr_base-0/ 
+      --output_dir further_pretrained_xlmr_base-0/ 
       --model_name_or_path xlm-roberta-base 
       --model_type xlmroberta 
       --train_data_file processed_data/cantemist/LM_xlm-roberta-base_150_75.txt 
@@ -39,6 +39,6 @@ python run_language_modeling.py
 
 Then, the ```run_classifier.py``` script can be ran, changing the following:
 ```
-      --model_type bert 
-      --model_name_or_path bert-base-multilingual-cased 
+      --model_type xlmroberta 
+      --model_name_or_path further_pretrained_xlmr_base-0/  
 ```
